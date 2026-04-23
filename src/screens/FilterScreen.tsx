@@ -4,14 +4,21 @@ import { TVButton } from '@/components/TVButton'
 import { appConfig, type FilterId } from '@/config/app-config'
 import { useSession } from '@/state/session-store'
 import { createCameraSource } from '@/lib/camera'
+import { dbUpdateSession } from '@/lib/supabase/sessions'
 import clsx from 'clsx'
 
 export function FilterScreen() {
   const goTo = useSession((s) => s.goTo)
   const filter = useSession((s) => s.filter)
   const setFilter = useSession((s) => s.setFilter)
+  const sessionId = useSession((s) => s.sessionId)
   const videoRef = useRef<HTMLVideoElement>(null)
   const sourceRef = useRef(createCameraSource())
+
+  const start = async () => {
+    if (sessionId) await dbUpdateSession(sessionId, { filter_id: filter, status: 'capturing' })
+    goTo('capture')
+  }
 
   useEffect(() => {
     const src = sourceRef.current
@@ -60,7 +67,7 @@ export function FilterScreen() {
           <TVButton variant="ghost" size="md" onClick={() => goTo('template')}>
             ◀ BACK
           </TVButton>
-          <TVButton variant="primary" size="lg" onClick={() => goTo('capture')}>
+          <TVButton variant="primary" size="lg" onClick={start}>
             START ▶
           </TVButton>
         </div>

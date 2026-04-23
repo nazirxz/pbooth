@@ -2,12 +2,19 @@ import { ChannelBar } from '@/components/ChannelBar'
 import { TVButton } from '@/components/TVButton'
 import { appConfig, type TemplateId } from '@/config/app-config'
 import { useSession } from '@/state/session-store'
+import { dbUpdateSession } from '@/lib/supabase/sessions'
 import clsx from 'clsx'
 
 export function TemplateScreen() {
   const goTo = useSession((s) => s.goTo)
   const template = useSession((s) => s.template)
   const setTemplate = useSession((s) => s.setTemplate)
+  const sessionId = useSession((s) => s.sessionId)
+
+  const next = async () => {
+    if (sessionId) await dbUpdateSession(sessionId, { template_id: template })
+    goTo('filter')
+  }
 
   return (
     <div className="absolute inset-0 flex flex-col">
@@ -45,7 +52,7 @@ export function TemplateScreen() {
           <TVButton variant="ghost" size="md" onClick={() => goTo('home')}>
             ◀ BACK
           </TVButton>
-          <TVButton variant="primary" size="lg" onClick={() => goTo('filter')}>
+          <TVButton variant="primary" size="lg" onClick={next}>
             NEXT ▶
           </TVButton>
         </div>

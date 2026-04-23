@@ -6,43 +6,83 @@ import { appConfig } from '@/config/app-config'
 import { getPaymentProvider, simulatePaid } from '@/lib/payment'
 import type { PaymentSession, PaymentStatus } from '@/lib/payment'
 import { useSession } from '@/state/session-store'
+import { dbCreateSession, dbUpdateSession } from '@/lib/supabase/sessions'
+import { dbCreatePayment, dbUpdatePaymentStatus } from '@/lib/supabase/payments'
 
 export function PaymentScreen() {
   const goTo = useSession((s) => s.goTo)
   const setPayment = useSession((s) => s.setPayment)
+  const setSessionId = useSession((s) => s.setSessionId)
+  const setPaymentRowId = useSession((s) => s.setPaymentRowId)
+
   const [session, setSession] = useState<PaymentSession | null>(null)
   const [qrImg, setQrImg] = useState<string>('')
   const [status, setStatus] = useState<PaymentStatus>('pending')
   const [remainingSec, setRemainingSec] = useState<number>(appConfig.payment.timeoutSec)
   const unsubRef = useRef<() => void>()
+  const paymentRowIdRef = useRef<string | null>(null)
+  const sessionIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     const provider = getPaymentProvider()
     let mounted = true
 
-    provider.createSession(appConfig.payment.amount).then(async (s) => {
+    ;(async () => {
+      // 1. DB session (nullable — keeps working offline / no env)
+      const row = await dbCreateSession()
       if (!mounted) return
-      setSession(s)
-      setPayment(s)
-      const img = await QRCode.toDataURL(s.qrString, {
+      sessionIdRef.current = row?.id ?? null
+      setSessionId(row?.id ?? null)
+
+      // 2. Payment provider — creates in-memory session with QR string
+      const pay = await provider.createSession(appConfig.payment.amount)
+      if (!mounted) return
+      setSession(pay)
+      setPayment(pay)
+
+      // 3. DB payment row (references session)
+      const payRow = await dbCreatePayment({
+        sessionId: row?.id ?? null,
+        provider: provider.name,
+        providerRef: pay.id,
+        amount: pay.amount,
+        qrString: pay.qrString,
+        expiresAt: pay.expiresAt,
+      })
+      if (!mounted) return
+      paymentRowIdRef.current = payRow?.id ?? null
+      setPaymentRowId(payRow?.id ?? null)
+      if (row && payRow) {
+        await dbUpdateSession(row.id, { payment_id: payRow.id })
+      }
+
+      // 4. Render QR image
+      const img = await QRCode.toDataURL(pay.qrString, {
         width: 560,
         margin: 2,
         color: { dark: '#f5e6c8', light: '#00000000' },
       })
+      if (!mounted) return
       setQrImg(img)
-      unsubRef.current = provider.onStatusChange(s.id, (newStatus) => {
+
+      // 5. Subscribe to provider status — mirror into Supabase + advance UI
+      unsubRef.current = provider.onStatusChange(pay.id, async (newStatus) => {
         setStatus(newStatus)
+        if (paymentRowIdRef.current) {
+          await dbUpdatePaymentStatus(paymentRowIdRef.current, newStatus)
+        }
         if (newStatus === 'paid') {
+          if (sessionIdRef.current) await dbUpdateSession(sessionIdRef.current, { status: 'paid' })
           setTimeout(() => goTo('template'), 900)
         }
       })
-    })
+    })()
 
     return () => {
       mounted = false
       unsubRef.current?.()
     }
-  }, [goTo, setPayment])
+  }, [goTo, setPayment, setSessionId, setPaymentRowId])
 
   useEffect(() => {
     if (!session) return
@@ -56,6 +96,8 @@ export function PaymentScreen() {
 
   const cancel = async () => {
     if (session) await getPaymentProvider().cancel(session.id)
+    if (paymentRowIdRef.current) await dbUpdatePaymentStatus(paymentRowIdRef.current, 'cancelled')
+    if (sessionIdRef.current) await dbUpdateSession(sessionIdRef.current, { status: 'cancelled' })
     goTo('home')
   }
 

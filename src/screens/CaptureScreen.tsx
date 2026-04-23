@@ -5,6 +5,7 @@ import { ChannelBar } from '@/components/ChannelBar'
 import { appConfig } from '@/config/app-config'
 import { useSession } from '@/state/session-store'
 import { createCameraSource } from '@/lib/camera'
+import { uploadPhoto } from '@/lib/supabase/photos'
 
 export function CaptureScreen() {
   const goTo = useSession((s) => s.goTo)
@@ -12,6 +13,7 @@ export function CaptureScreen() {
   const template = useSession((s) => s.template)
   const addPhoto = useSession((s) => s.addPhoto)
   const clearPhotos = useSession((s) => s.clearPhotos)
+  const sessionId = useSession((s) => s.sessionId)
 
   const tmpl = appConfig.templates.find((t) => t.id === template)!
   const frameCount = tmpl.frames
@@ -50,6 +52,8 @@ export function CaptureScreen() {
         const blob = await src.capture(videoRef.current)
         const dataUrl = await blobToDataUrl(blob)
         addPhoto({ index: i, blob, dataUrl })
+        // Fire and forget — don't block the capture loop on network.
+        if (sessionId) void uploadPhoto(sessionId, i, blob)
         await wait(appConfig.capture.delayBetweenFramesMs)
       }
 
@@ -64,7 +68,7 @@ export function CaptureScreen() {
       cancelled = true
       src.stop()
     }
-  }, [frameCount, addPhoto, clearPhotos, goTo])
+  }, [frameCount, addPhoto, clearPhotos, goTo, sessionId])
 
   return (
     <div className="absolute inset-0 flex flex-col">
