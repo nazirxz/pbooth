@@ -1,0 +1,43 @@
+{
+  "name": "pbooth",
+  "version": "0.1.0",
+  "description": "Retro TV photobooth kiosk app",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "dev:web": "PBOOTH_TARGET=web vite",
+    "build": "tsc -b && vite build && electron-builder",
+    "build:web": "PBOOTH_TARGET=web tsc -b && PBOOTH_TARGET=web vite build",
+    "preview": "vite preview",
+    "preview:web": "PBOOTH_TARGET=web vite preview --port 4173",
+    "typecheck": "tsc -b --noEmit",
+    "electron:dev": "vite"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.10",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.15.0",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.2"
+  }
+}
