@@ -4,9 +4,9 @@ export const appConfig = {
     idleResetMs: 60_000,
   },
   viewport: {
-    width: 1080,
-    height: 1920,
-    orientation: 'portrait' as const,
+    width: 1920,
+    height: 1080,
+    orientation: 'landscape' as const,
   },
   camera: {
     source: 'webcam' as 'webcam' | 'dslr',

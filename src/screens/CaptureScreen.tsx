@@ -14,6 +14,7 @@ export function CaptureScreen() {
   const addPhoto = useSession((s) => s.addPhoto)
   const clearPhotos = useSession((s) => s.clearPhotos)
   const sessionId = useSession((s) => s.sessionId)
+  const photos = useSession((s) => s.photos)
 
   const tmpl = appConfig.templates.find((t) => t.id === template)!
   const frameCount = tmpl.frames
@@ -32,7 +33,6 @@ export function CaptureScreen() {
     const run = async () => {
       const stream = await src.start()
       if (videoRef.current) videoRef.current.srcObject = stream
-      // small delay so first frame is ready
       await wait(500)
 
       for (let i = 0; i < frameCount; i++) {
@@ -52,7 +52,6 @@ export function CaptureScreen() {
         const blob = await src.capture(videoRef.current)
         const dataUrl = await blobToDataUrl(blob)
         addPhoto({ index: i, blob, dataUrl })
-        // Fire and forget — don't block the capture loop on network.
         if (sessionId) void uploadPhoto(sessionId, i, blob)
         await wait(appConfig.capture.delayBetweenFramesMs)
       }
@@ -72,10 +71,10 @@ export function CaptureScreen() {
 
   return (
     <div className="absolute inset-0 flex flex-col">
-      <ChannelBar channel="05" label={`SHOT ${frameIdx + 1}/${frameCount}`} />
+      <ChannelBar channel="05" label={`SHOT ${Math.min(frameIdx + 1, frameCount)}/${frameCount}`} />
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6">
-        <div className="relative w-full aspect-[4/3] border-4 border-crt-bezelLight rounded-2xl overflow-hidden bg-black scanlines">
+      <div className="flex-1 grid grid-cols-[1fr_auto] gap-8 px-10 pb-6">
+        <div className="relative border-4 border-crt-bezelLight rounded-2xl overflow-hidden bg-black scanlines">
           <video
             ref={videoRef}
             autoPlay
@@ -95,7 +94,7 @@ export function CaptureScreen() {
                 transition={{ duration: 0.3 }}
                 className="absolute inset-0 flex items-center justify-center"
               >
-                <div className="font-pixel text-[14rem] text-crt-phosphor rgb-split drop-shadow-[0_0_20px_rgba(57,255,20,0.6)]">
+                <div className="font-pixel text-[16rem] text-crt-phosphor rgb-split drop-shadow-[0_0_20px_rgba(57,255,20,0.6)]">
                   {countdown}
                 </div>
               </motion.div>
@@ -105,20 +104,34 @@ export function CaptureScreen() {
           {flash && <div className="absolute inset-0 bg-white animate-pulse" />}
         </div>
 
-        <div className="flex gap-3">
-          {Array.from({ length: frameCount }).map((_, i) => (
-            <div
-              key={i}
-              className={clsx(
-                'w-6 h-6 rounded-full border-2',
-                i < frameIdx
-                  ? 'bg-crt-phosphor border-crt-phosphor'
-                  : i === frameIdx
-                  ? 'border-crt-phosphor animate-blink'
-                  : 'border-crt-cream/40',
-              )}
-            />
-          ))}
+        <div className="w-[260px] flex flex-col gap-3 items-center">
+          <div className="font-crt text-2xl text-crt-cream tracking-widest">SHOTS</div>
+
+          <div className="flex flex-col gap-3 w-full">
+            {Array.from({ length: frameCount }).map((_, i) => {
+              const p = photos.find((x) => x.index === i)
+              const active = i === frameIdx
+              return (
+                <div
+                  key={i}
+                  className={clsx(
+                    'w-full aspect-[4/3] rounded-lg border-4 overflow-hidden bg-black/50 flex items-center justify-center',
+                    p
+                      ? 'border-crt-phosphor'
+                      : active
+                      ? 'border-crt-amber animate-blink'
+                      : 'border-crt-cream/30',
+                  )}
+                >
+                  {p ? (
+                    <img src={p.dataUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="font-crt text-3xl text-crt-cream/40">{i + 1}</div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>

@@ -6,15 +6,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL
 
-// Portrait target 1080x1920. Dev window = scaled to fit laptop display.
-const TARGET = { width: 1080, height: 1920 }
+// Landscape target 1920x1080. Dev window = scaled to fit laptop display.
+const TARGET = { width: 1920, height: 1080 }
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: isDev ? 540 : TARGET.width,
-    height: isDev ? 960 : TARGET.height,
-    minWidth: 360,
-    minHeight: 640,
+    width: isDev ? 1280 : TARGET.width,
+    height: isDev ? 720 : TARGET.height,
+    minWidth: 960,
+    minHeight: 540,
     fullscreen: !isDev,
     kiosk: !isDev,
     frame: isDev,

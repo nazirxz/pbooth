@@ -87,7 +87,7 @@ body::-webkit-scrollbar { display: none; }
   filter: brightness(1.2);
 }
 
-/* Utility: preserve screen aspect at 1080x1920 but scale to viewport */
+/* Utility: preserve 16:9 landscape aspect but scale to viewport */
 .kiosk-frame {
   width: 100vw;
   height: 100vh;
@@ -98,8 +98,8 @@ body::-webkit-scrollbar { display: none; }
 
 .kiosk-stage {
   position: relative;
-  width: min(100vw, calc(100vh * 9 / 16));
-  height: min(100vh, calc(100vw * 16 / 9));
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
   overflow: hidden;
   background: #000;
 }

@@ -108,43 +108,49 @@ export function PaymentScreen() {
     <div className="absolute inset-0 flex flex-col">
       <ChannelBar channel="02" label="PAYMENT" />
 
-      <div className="flex-1 flex flex-col items-center px-10 gap-6">
-        <div className="font-pixel text-4xl text-crt-phosphor rgb-split mt-2">SCAN TO PAY</div>
-        <div className="font-crt text-2xl text-crt-cream/80 tracking-widest">
-          RP {appConfig.payment.amount.toLocaleString('id-ID')}
-        </div>
-
-        <div className="relative p-8 bg-crt-cream rounded-2xl shadow-[0_0_40px_rgba(245,230,200,0.15)]">
+      <div className="flex-1 grid grid-cols-[auto_1fr] items-center gap-12 px-14 pb-6">
+        <div className="relative p-6 bg-crt-cream rounded-2xl shadow-[0_0_40px_rgba(245,230,200,0.15)]">
           {qrImg ? (
             <img
               src={qrImg}
               alt="Payment QR"
-              className="w-[560px] h-[560px] object-contain"
+              className="w-[440px] h-[440px] object-contain"
               style={{ filter: 'contrast(1.1)' }}
             />
           ) : (
-            <div className="w-[560px] h-[560px] grid place-items-center font-crt text-3xl text-black/60">
+            <div className="w-[440px] h-[440px] grid place-items-center font-crt text-2xl text-black/60">
               GENERATING QR...
             </div>
           )}
           <div className="absolute inset-0 scanlines pointer-events-none rounded-2xl" />
         </div>
 
-        <StatusLine status={status} />
+        <div className="flex flex-col gap-6">
+          <div>
+            <div className="font-pixel text-5xl text-crt-phosphor rgb-split leading-tight">
+              SCAN TO PAY
+            </div>
+            <div className="mt-3 font-crt text-3xl text-crt-cream/80 tracking-widest">
+              RP {appConfig.payment.amount.toLocaleString('id-ID')}
+            </div>
+          </div>
 
-        <div className="font-crt text-2xl text-crt-amber tracking-widest">
-          EXPIRES IN {mm}:{ss}
-        </div>
+          <StatusLine status={status} />
 
-        <div className="mt-auto mb-8 flex gap-4 w-full justify-center">
-          <TVButton variant="ghost" size="md" onClick={cancel}>
-            ✕ CANCEL
-          </TVButton>
-          {appConfig.payment.devSkipButton && session && status === 'pending' && (
-            <TVButton variant="secondary" size="md" onClick={() => simulatePaid(session.id)}>
-              DEV: SIMULATE PAID
+          <div className="font-crt text-2xl text-crt-amber tracking-widest">
+            EXPIRES IN {mm}:{ss}
+          </div>
+
+          <div className="flex gap-4 flex-wrap mt-4">
+            <TVButton variant="ghost" size="md" onClick={cancel}>
+              ✕ CANCEL
             </TVButton>
-          )}
+            {appConfig.payment.devSkipButton && session && status === 'pending' && (
+              <TVButton variant="secondary" size="md" onClick={() => simulatePaid(session.id)}>
+                DEV: SIMULATE PAID
+              </TVButton>
+            )}
+          </div>
         </div>
       </div>
     </div>

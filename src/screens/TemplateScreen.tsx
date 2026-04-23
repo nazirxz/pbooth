@@ -20,35 +20,33 @@ export function TemplateScreen() {
     <div className="absolute inset-0 flex flex-col">
       <ChannelBar channel="03" label="TEMPLATE" />
 
-      <div className="flex-1 flex flex-col items-center px-10 gap-8">
-        <div className="font-pixel text-4xl text-crt-phosphor rgb-split mt-2">PICK A LAYOUT</div>
+      <div className="flex-1 flex flex-col items-center px-14 pt-2 pb-6 gap-6">
+        <div className="font-pixel text-4xl text-crt-phosphor rgb-split">PICK A LAYOUT</div>
 
-        <div className="w-full grid grid-cols-1 gap-6 mt-4">
+        <div className="grid grid-cols-3 gap-6 w-full flex-1 items-stretch">
           {appConfig.templates.map((t) => (
             <button
               key={t.id}
               onClick={() => setTemplate(t.id as TemplateId)}
               className={clsx(
-                'touch-press relative border-4 rounded-2xl px-8 py-6 text-left font-crt',
+                'touch-press relative border-4 rounded-2xl px-6 py-5 flex flex-col items-center justify-center gap-4 font-crt',
                 template === t.id
                   ? 'border-crt-phosphor bg-crt-phosphor/10 shadow-[0_0_30px_rgba(57,255,20,0.35)]'
                   : 'border-crt-cream/30 bg-black/40',
               )}
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-4xl tracking-widest text-crt-cream">{t.label}</div>
-                  <div className="text-xl text-crt-amber mt-1">
-                    {t.frames} PHOTOS · {t.layout.toUpperCase()}
-                  </div>
+              <TemplateThumb id={t.id} />
+              <div className="text-center">
+                <div className="text-3xl tracking-widest text-crt-cream">{t.label}</div>
+                <div className="text-lg text-crt-amber mt-1">
+                  {t.frames} PHOTOS · {t.layout.toUpperCase()}
                 </div>
-                <TemplateThumb id={t.id} />
               </div>
             </button>
           ))}
         </div>
 
-        <div className="mt-auto mb-8 flex gap-6 w-full justify-between">
+        <div className="flex gap-6 w-full justify-between">
           <TVButton variant="ghost" size="md" onClick={() => goTo('home')}>
             ◀ BACK
           </TVButton>
@@ -62,10 +60,10 @@ export function TemplateScreen() {
 }
 
 function TemplateThumb({ id }: { id: string }) {
-  const common = 'w-24 h-32 border-2 border-crt-cream/60 grid gap-1 p-1 bg-black/60'
+  const common = 'border-2 border-crt-cream/60 grid gap-1 p-1 bg-black/60'
   if (id === 'strip-4')
     return (
-      <div className={clsx(common, 'grid-rows-4')}>
+      <div className={clsx(common, 'grid-rows-4 w-20 h-40')}>
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className="bg-crt-cream/20 rounded-sm" />
         ))}
@@ -73,14 +71,14 @@ function TemplateThumb({ id }: { id: string }) {
     )
   if (id === 'strip-3')
     return (
-      <div className={clsx(common, 'grid-rows-3')}>
+      <div className={clsx(common, 'grid-rows-3 w-20 h-40')}>
         {[0, 1, 2].map((i) => (
           <div key={i} className="bg-crt-cream/20 rounded-sm" />
         ))}
       </div>
     )
   return (
-    <div className={clsx(common, 'grid-cols-2 grid-rows-2')}>
+    <div className={clsx(common, 'grid-cols-2 grid-rows-2 w-32 h-32')}>
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className="bg-crt-cream/20 rounded-sm" />
       ))}

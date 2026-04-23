@@ -79,28 +79,33 @@ export function PreviewScreen() {
     <div className="absolute inset-0 flex flex-col">
       <ChannelBar channel="06" label="PREVIEW" />
 
-      <div className="flex-1 flex flex-col items-center px-8 gap-5">
-        <div className="font-pixel text-4xl text-crt-phosphor rgb-split mt-2">YOUR STRIP</div>
-
-        <div className="bg-crt-cream p-4 rounded-2xl shadow-[0_0_30px_rgba(245,230,200,0.15)] max-h-[55vh] overflow-hidden">
+      <div className="flex-1 grid grid-cols-[auto_1fr] gap-10 px-14 pb-6 min-h-0">
+        <div className="bg-crt-cream p-4 rounded-2xl shadow-[0_0_30px_rgba(245,230,200,0.15)] flex items-center justify-center">
           {composed ? (
-            <img src={composed.dataUrl} alt="Composed strip" className="h-full max-h-[50vh] object-contain" />
+            <img src={composed.dataUrl} alt="Composed strip" className="h-full max-h-full object-contain" />
           ) : (
-            <div className="w-[300px] h-[400px] grid place-items-center font-crt text-xl text-black/60">
+            <div className="w-[280px] h-[380px] grid place-items-center font-crt text-xl text-black/60">
               COMPOSING...
             </div>
           )}
         </div>
 
-        <QRPanel state={uploadState} qrImg={qrImg} />
+        <div className="flex flex-col gap-6 justify-center">
+          <div className="font-pixel text-5xl text-crt-phosphor rgb-split leading-tight">YOUR STRIP</div>
+          <div className="font-crt text-2xl text-crt-cream/80 tracking-widest">
+            LOOKING GOOD ✦
+          </div>
 
-        <div className="mt-auto mb-6 flex gap-4 w-full justify-center flex-wrap">
-          <TVButton variant="secondary" size="md" onClick={download} disabled={!composed}>
-            ⬇ DOWNLOAD
-          </TVButton>
-          <TVButton variant="primary" size="lg" onClick={reset}>
-            ▶ NEW SESSION
-          </TVButton>
+          <QRPanel state={uploadState} qrImg={qrImg} />
+
+          <div className="flex gap-4 flex-wrap mt-2">
+            <TVButton variant="secondary" size="md" onClick={download} disabled={!composed}>
+              ⬇ DOWNLOAD
+            </TVButton>
+            <TVButton variant="primary" size="lg" onClick={reset}>
+              ▶ NEW SESSION
+            </TVButton>
+          </div>
         </div>
       </div>
     </div>
