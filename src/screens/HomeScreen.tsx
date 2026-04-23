@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { ChannelBar } from '@/components/ChannelBar'
 import { TVButton } from '@/components/TVButton'
+import { Logo } from '@/components/Logo'
 import { useSession } from '@/state/session-store'
 import { appConfig } from '@/config/app-config'
 
@@ -19,15 +20,16 @@ export function HomeScreen() {
           transition={{ duration: 0.6 }}
           className="text-left"
         >
+          <Logo variant="white" className="w-[320px] h-[80px] -ml-2 mb-2" />
           <div className="font-pixel text-7xl text-crt-phosphor rgb-split leading-[1.15]">
             PHOTO
             <br />
             BOOTH
           </div>
-          <div className="mt-8 font-crt text-3xl text-crt-cream/85 tracking-widest">
+          <div className="mt-6 font-crt text-3xl text-crt-cream/85 tracking-widest">
             RETRO TV EDITION
           </div>
-          <div className="mt-4 font-crt text-2xl text-crt-amber/90 tracking-widest">
+          <div className="mt-3 font-crt text-2xl text-crt-amber/90 tracking-widest">
             {appConfig.payment.enabled
               ? `RP ${appConfig.payment.amount.toLocaleString('id-ID')} / SESSION`
               : 'FREE MODE'}

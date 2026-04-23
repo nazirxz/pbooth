@@ -105,10 +105,10 @@ export function PaymentScreen() {
   const ss = String(remainingSec % 60).padStart(2, '0')
 
   return (
-    <div className="absolute inset-0 flex flex-col">
+    <div className="absolute inset-0 grid grid-rows-[auto_1fr]">
       <ChannelBar channel="02" label="PAYMENT" />
 
-      <div className="flex-1 grid grid-cols-[auto_1fr] items-center gap-12 px-14 pb-6">
+      <div className="grid grid-cols-[auto_1fr] items-center gap-12 px-14 pb-4 min-h-0">
         <div className="relative p-6 bg-crt-cream rounded-2xl shadow-[0_0_40px_rgba(245,230,200,0.15)]">
           {qrImg ? (
             <img

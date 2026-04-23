@@ -76,10 +76,10 @@ export function PreviewScreen() {
   }
 
   return (
-    <div className="absolute inset-0 flex flex-col">
+    <div className="absolute inset-0 grid grid-rows-[auto_1fr]">
       <ChannelBar channel="06" label="PREVIEW" />
 
-      <div className="flex-1 grid grid-cols-[auto_1fr] gap-10 px-14 pb-6 min-h-0">
+      <div className="grid grid-cols-[auto_1fr] gap-10 px-14 pb-4 min-h-0">
         <div className="bg-crt-cream p-4 rounded-2xl shadow-[0_0_30px_rgba(245,230,200,0.15)] flex items-center justify-center">
           {composed ? (
             <img src={composed.dataUrl} alt="Composed strip" className="h-full max-h-full object-contain" />

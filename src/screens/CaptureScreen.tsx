@@ -70,17 +70,17 @@ export function CaptureScreen() {
   }, [frameCount, addPhoto, clearPhotos, goTo, sessionId])
 
   return (
-    <div className="absolute inset-0 flex flex-col">
+    <div className="absolute inset-0 grid grid-rows-[auto_1fr]">
       <ChannelBar channel="05" label={`SHOT ${Math.min(frameIdx + 1, frameCount)}/${frameCount}`} />
 
-      <div className="flex-1 grid grid-cols-[1fr_auto] gap-8 px-10 pb-6">
-        <div className="relative border-4 border-crt-bezelLight rounded-2xl overflow-hidden bg-black scanlines">
+      <div className="grid grid-cols-[1fr_260px] gap-6 px-10 pb-4 min-h-0">
+        <div className="relative border-4 border-crt-bezelLight rounded-2xl overflow-hidden bg-black scanlines min-h-0">
           <video
             ref={videoRef}
             autoPlay
             playsInline
             muted
-            className={clsx('w-full h-full object-cover', `filter-${filter}`)}
+            className={clsx('absolute inset-0 w-full h-full object-cover', `filter-${filter}`)}
             style={{ transform: 'scaleX(-1)' }}
           />
 
@@ -94,7 +94,7 @@ export function CaptureScreen() {
                 transition={{ duration: 0.3 }}
                 className="absolute inset-0 flex items-center justify-center"
               >
-                <div className="font-pixel text-[16rem] text-crt-phosphor rgb-split drop-shadow-[0_0_20px_rgba(57,255,20,0.6)]">
+                <div className="font-pixel text-[14rem] text-crt-phosphor rgb-split drop-shadow-[0_0_20px_rgba(57,255,20,0.6)]">
                   {countdown}
                 </div>
               </motion.div>
@@ -104,34 +104,34 @@ export function CaptureScreen() {
           {flash && <div className="absolute inset-0 bg-white animate-pulse" />}
         </div>
 
-        <div className="w-[260px] flex flex-col gap-3 items-center">
-          <div className="font-crt text-2xl text-crt-cream tracking-widest">SHOTS</div>
-
-          <div className="flex flex-col gap-3 w-full">
-            {Array.from({ length: frameCount }).map((_, i) => {
-              const p = photos.find((x) => x.index === i)
-              const active = i === frameIdx
-              return (
-                <div
-                  key={i}
-                  className={clsx(
-                    'w-full aspect-[4/3] rounded-lg border-4 overflow-hidden bg-black/50 flex items-center justify-center',
-                    p
-                      ? 'border-crt-phosphor'
-                      : active
-                      ? 'border-crt-amber animate-blink'
-                      : 'border-crt-cream/30',
-                  )}
-                >
-                  {p ? (
-                    <img src={p.dataUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="font-crt text-3xl text-crt-cream/40">{i + 1}</div>
-                  )}
-                </div>
-              )
-            })}
+        <div className="flex flex-col gap-3 items-stretch min-h-0 overflow-y-auto">
+          <div className="font-crt text-2xl text-crt-cream tracking-widest text-center shrink-0">
+            SHOTS
           </div>
+
+          {Array.from({ length: frameCount }).map((_, i) => {
+            const p = photos.find((x) => x.index === i)
+            const active = i === frameIdx
+            return (
+              <div
+                key={i}
+                className={clsx(
+                  'w-full aspect-[4/3] rounded-lg border-4 overflow-hidden bg-black/50 flex items-center justify-center shrink-0',
+                  p
+                    ? 'border-crt-phosphor'
+                    : active
+                    ? 'border-crt-amber animate-blink'
+                    : 'border-crt-cream/30',
+                )}
+              >
+                {p ? (
+                  <img src={p.dataUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="font-crt text-3xl text-crt-cream/40">{i + 1}</div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

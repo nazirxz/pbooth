@@ -17,13 +17,13 @@ export function TemplateScreen() {
   }
 
   return (
-    <div className="absolute inset-0 flex flex-col">
+    <div className="absolute inset-0 grid grid-rows-[auto_1fr]">
       <ChannelBar channel="03" label="TEMPLATE" />
 
-      <div className="flex-1 flex flex-col items-center px-14 pt-2 pb-6 gap-6">
+      <div className="grid grid-rows-[auto_1fr_auto] gap-5 px-14 pb-4 min-h-0">
         <div className="font-pixel text-4xl text-crt-phosphor rgb-split">PICK A LAYOUT</div>
 
-        <div className="grid grid-cols-3 gap-6 w-full flex-1 items-stretch">
+        <div className="grid grid-cols-3 gap-6 items-stretch min-h-0">
           {appConfig.templates.map((t) => (
             <button
               key={t.id}
@@ -46,7 +46,7 @@ export function TemplateScreen() {
           ))}
         </div>
 
-        <div className="flex gap-6 w-full justify-between">
+        <div className="flex gap-6 justify-between">
           <TVButton variant="ghost" size="md" onClick={() => goTo('home')}>
             ◀ BACK
           </TVButton>

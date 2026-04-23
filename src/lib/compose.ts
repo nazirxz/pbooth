@@ -1,10 +1,25 @@
 import { appConfig, type FilterId, type TemplateId } from '@/config/app-config'
 import type { CapturedPhoto } from '@/state/session-store'
+import logoBlackUrl from '@/asset/euorna_black.jpeg'
 
 interface ComposeOpts {
   photos: CapturedPhoto[]
   template: TemplateId
   filter: FilterId
+}
+
+let cachedLogo: HTMLImageElement | null = null
+async function getLogo(): Promise<HTMLImageElement> {
+  if (cachedLogo) return cachedLogo
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = reject
+    img.src = logoBlackUrl
+  })
+  cachedLogo = img
+  return img
 }
 
 const CANVAS_FILTER_MAP: Record<FilterId, string> = {
@@ -82,17 +97,35 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
     ctx.strokeRect(x, y, frameW, frameH)
   }
 
-  // Footer — retro brand strip
+  // Footer — retro brand strip with euorna logo
   const footerY = canvas.height - FOOTER + 10
   ctx.fillStyle = '#1a1412'
-  ctx.fillRect(PAD, footerY, canvas.width - PAD * 2, 4)
+  ctx.fillRect(PAD, footerY, canvas.width - PAD * 2, 3)
+
+  const logo = await getLogo().catch(() => null)
+  if (logo) {
+    // logo image is tall portrait; crop to the text band via source rect
+    const srcH = logo.height * 0.12
+    const srcY = logo.height * 0.58
+    const destH = 48
+    const destW = destH * ((logo.width * 1) / srcH)
+    // multiply blend: draw logo over the cream, then use globalCompositeOperation
+    ctx.save()
+    ctx.globalCompositeOperation = 'multiply'
+    ctx.drawImage(logo, 0, srcY, logo.width, srcH, PAD + 6, footerY + 14, destW, destH)
+    ctx.restore()
+  } else {
+    ctx.fillStyle = '#1a1412'
+    ctx.font = 'bold 28px "Press Start 2P", monospace'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('EUORNA', PAD + 6, footerY + 40)
+  }
+
   ctx.fillStyle = '#1a1412'
-  ctx.font = 'bold 32px "Press Start 2P", monospace'
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('PBOOTH', PAD + 6, footerY + 40)
   ctx.font = '24px "VT323", monospace'
   ctx.textAlign = 'right'
+  ctx.textBaseline = 'middle'
   ctx.fillText(
     new Date()
       .toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: '2-digit' })

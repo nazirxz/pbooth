@@ -32,23 +32,25 @@ export function FilterScreen() {
   }, [])
 
   return (
-    <div className="absolute inset-0 flex flex-col">
+    <div className="absolute inset-0 grid grid-rows-[auto_1fr]">
       <ChannelBar channel="04" label="FILTER" />
 
-      <div className="flex-1 grid grid-cols-[1fr_auto] gap-8 px-10 pb-6">
-        <div className="flex flex-col gap-4 min-h-0">
+      <div className="grid grid-cols-[1fr_320px] gap-6 px-10 pb-4 min-h-0">
+        <div className="grid grid-rows-[auto_1fr_auto] gap-3 min-h-0">
           <div className="font-pixel text-3xl text-crt-phosphor rgb-split">PICK A VIBE</div>
-          <div className="relative flex-1 border-4 border-crt-bezelLight rounded-2xl overflow-hidden bg-black scanlines">
+
+          <div className="relative border-4 border-crt-bezelLight rounded-2xl overflow-hidden bg-black scanlines min-h-0">
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className={clsx('w-full h-full object-cover', `filter-${filter}`)}
+              className={clsx('absolute inset-0 w-full h-full object-cover', `filter-${filter}`)}
               style={{ transform: 'scaleX(-1)' }}
             />
           </div>
-          <div className="flex justify-between">
+
+          <div className="flex justify-between items-center">
             <TVButton variant="ghost" size="md" onClick={() => goTo('template')}>
               ◀ BACK
             </TVButton>
@@ -58,13 +60,13 @@ export function FilterScreen() {
           </div>
         </div>
 
-        <div className="w-[340px] flex flex-col gap-3 overflow-y-auto">
+        <div className="flex flex-col gap-2 min-h-0 overflow-y-auto pr-1">
           {appConfig.filters.map((f) => (
             <button
               key={f.id}
               onClick={() => setFilter(f.id as FilterId)}
               className={clsx(
-                'touch-press border-4 rounded-xl py-5 font-crt text-2xl tracking-widest',
+                'touch-press border-4 rounded-xl py-4 font-crt text-2xl tracking-widest shrink-0',
                 filter === f.id
                   ? 'border-crt-phosphor bg-crt-phosphor/15 text-crt-phosphor shadow-[0_0_20px_rgba(57,255,20,0.4)]'
                   : 'border-crt-cream/30 bg-black/40 text-crt-cream',
