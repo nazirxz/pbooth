@@ -104,15 +104,20 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
 
   const logo = await getLogo().catch(() => null)
   if (logo) {
-    // logo image is tall portrait; crop to the text band via source rect
-    const srcH = logo.height * 0.12
-    const srcY = logo.height * 0.58
-    const destH = 48
-    const destW = destH * ((logo.width * 1) / srcH)
-    // multiply blend: draw logo over the cream, then use globalCompositeOperation
+    // The source JPEG is a tall portrait with the word "euorna" centered roughly
+    // at 63% of the image height. We crop a generous horizontal band around it
+    // so the letters always land fully inside the destination rect, then draw
+    // with multiply so the white source background drops out on the cream page.
+    const cropCenterY = 0.63
+    const cropHeightPct = 0.22
+    const srcY = logo.height * (cropCenterY - cropHeightPct / 2)
+    const srcH = logo.height * cropHeightPct
+    const destH = 56
+    const destW = destH * (logo.width / srcH)
+    const destY = footerY + (FOOTER - destH) / 2 - 2
     ctx.save()
     ctx.globalCompositeOperation = 'multiply'
-    ctx.drawImage(logo, 0, srcY, logo.width, srcH, PAD + 6, footerY + 14, destW, destH)
+    ctx.drawImage(logo, 0, srcY, logo.width, srcH, PAD + 6, destY, destW, destH)
     ctx.restore()
   } else {
     ctx.fillStyle = '#1a1412'
