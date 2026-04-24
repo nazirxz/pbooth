@@ -1,11 +1,13 @@
-import { appConfig, type FilterId, type TemplateId } from '@/config/app-config'
+import { appConfig, type TemplateId } from '@/config/app-config'
 import type { CapturedPhoto } from '@/state/session-store'
+import type { Theme } from '@/themes'
 import logoBlackUrl from '@/asset/euorna_black.jpeg'
 
 interface ComposeOpts {
   photos: CapturedPhoto[]
   template: TemplateId
-  filter: FilterId
+  filterId: string
+  theme: Theme
 }
 
 let cachedLogo: HTMLImageElement | null = null
@@ -22,22 +24,10 @@ async function getLogo(): Promise<HTMLImageElement> {
   return img
 }
 
-const CANVAS_FILTER_MAP: Record<FilterId, string> = {
-  'none': 'none',
-  'bw-grain': 'grayscale(1) contrast(1.15) brightness(1.05)',
-  'sepia': 'sepia(0.75) contrast(1.1) saturate(1.2)',
-  'vhs': 'saturate(1.4) contrast(1.2) hue-rotate(-5deg)',
-  'neon-80s': 'saturate(1.6) contrast(1.3) hue-rotate(280deg)',
-  'polaroid': 'saturate(0.85) contrast(0.95) brightness(1.08)',
-}
-
-/**
- * Composes captured photos into a single printable strip/grid JPEG.
- * Output dimensions target ~2:3 print aspect for strips, 1:1-ish for grid.
- */
 export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
   const tmpl = appConfig.templates.find((t) => t.id === opts.template)!
   const imgs = await Promise.all(opts.photos.map(loadImage))
+  const { theme } = opts
 
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')!
@@ -45,7 +35,7 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
   const PAD = 40
   const GAP = 20
   const FOOTER = 80
-  const FRAME_BORDER = 4
+  const FRAME_BORDER = theme.id === 'y2k' ? 5 : 4
 
   let frameW: number
   let frameH: number
@@ -67,14 +57,25 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
   canvas.width = PAD * 2 + cols * frameW + (cols - 1) * GAP
   canvas.height = PAD * 2 + rows * frameH + (rows - 1) * GAP + FOOTER
 
-  // Cream/polaroid background
-  ctx.fillStyle = '#f5e6c8'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  // Paper background — solid for retro, gradient for y2k
+  if (theme.id === 'y2k') {
+    const grd = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
+    grd.addColorStop(0, '#ffe3f1')
+    grd.addColorStop(0.5, '#ffffff')
+    grd.addColorStop(1, '#e4f4ff')
+    ctx.fillStyle = grd
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+  } else {
+    ctx.fillStyle = theme.compose.paperBg
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+  }
 
-  // Subtle paper texture (noise)
-  drawNoise(ctx, canvas.width, canvas.height, 0.04)
+  if (theme.compose.noiseAmount > 0) {
+    drawNoise(ctx, canvas.width, canvas.height, theme.compose.noiseAmount)
+  }
 
-  ctx.filter = CANVAS_FILTER_MAP[opts.filter] ?? 'none'
+  const filterClass = theme.filters.find((f) => f.id === opts.filterId)
+  ctx.filter = filterClass?.css ?? 'none'
 
   for (let i = 0; i < imgs.length && i < cols * rows; i++) {
     const row = Math.floor(i / cols)
@@ -86,28 +87,53 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
 
   ctx.filter = 'none'
 
-  // Frame borders on top (sharp, no filter)
-  ctx.strokeStyle = '#1a1412'
-  ctx.lineWidth = FRAME_BORDER
-  for (let i = 0; i < imgs.length && i < cols * rows; i++) {
-    const row = Math.floor(i / cols)
-    const col = i % cols
-    const x = PAD + col * (frameW + GAP)
-    const y = PAD + row * (frameH + GAP)
-    ctx.strokeRect(x, y, frameW, frameH)
+  // Frame borders — retro: sharp black; y2k: gradient pink/purple stroke
+  if (theme.id === 'y2k') {
+    for (let i = 0; i < imgs.length && i < cols * rows; i++) {
+      const row = Math.floor(i / cols)
+      const col = i % cols
+      const x = PAD + col * (frameW + GAP)
+      const y = PAD + row * (frameH + GAP)
+      const strokeGrad = ctx.createLinearGradient(x, y, x + frameW, y + frameH)
+      strokeGrad.addColorStop(0, '#ff4fa1')
+      strokeGrad.addColorStop(1, '#93e9ff')
+      ctx.strokeStyle = strokeGrad
+      ctx.lineWidth = FRAME_BORDER
+      roundRect(ctx, x - FRAME_BORDER / 2, y - FRAME_BORDER / 2, frameW + FRAME_BORDER, frameH + FRAME_BORDER, 18)
+      ctx.stroke()
+    }
+  } else {
+    ctx.strokeStyle = theme.compose.borderColor
+    ctx.lineWidth = FRAME_BORDER
+    for (let i = 0; i < imgs.length && i < cols * rows; i++) {
+      const row = Math.floor(i / cols)
+      const col = i % cols
+      const x = PAD + col * (frameW + GAP)
+      const y = PAD + row * (frameH + GAP)
+      ctx.strokeRect(x, y, frameW, frameH)
+    }
   }
 
-  // Footer — retro brand strip with euorna logo
+  // Y2K: sprinkle stickers at frame corners
+  if (theme.id === 'y2k') {
+    drawStickers(ctx, cols, rows, PAD, GAP, frameW, frameH)
+  }
+
+  // Footer
   const footerY = canvas.height - FOOTER + 10
-  ctx.fillStyle = '#1a1412'
-  ctx.fillRect(PAD, footerY, canvas.width - PAD * 2, 3)
+  if (theme.id === 'y2k') {
+    const footerGrad = ctx.createLinearGradient(0, footerY, canvas.width, footerY)
+    footerGrad.addColorStop(0, '#ffe3f1')
+    footerGrad.addColorStop(1, '#e4f4ff')
+    ctx.fillStyle = footerGrad
+    ctx.fillRect(PAD, footerY, canvas.width - PAD * 2, FOOTER - 14)
+  } else {
+    ctx.fillStyle = theme.compose.borderColor
+    ctx.fillRect(PAD, footerY, canvas.width - PAD * 2, 3)
+  }
 
   const logo = await getLogo().catch(() => null)
   if (logo) {
-    // The source JPEG is a tall portrait with the word "euorna" centered roughly
-    // at 63% of the image height. We crop a generous horizontal band around it
-    // so the letters always land fully inside the destination rect, then draw
-    // with multiply so the white source background drops out on the cream page.
     const cropCenterY = 0.63
     const cropHeightPct = 0.22
     const srcY = logo.height * (cropCenterY - cropHeightPct / 2)
@@ -117,30 +143,30 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
     const destY = footerY + (FOOTER - destH) / 2 - 2
     ctx.save()
     ctx.globalCompositeOperation = 'multiply'
-    ctx.drawImage(logo, 0, srcY, logo.width, srcH, PAD + 6, destY, destW, destH)
+    ctx.drawImage(logo, 0, srcY, logo.width, srcH, PAD + 12, destY, destW, destH)
     ctx.restore()
   } else {
-    ctx.fillStyle = '#1a1412'
-    ctx.font = 'bold 28px "Press Start 2P", monospace'
+    ctx.fillStyle = theme.compose.footerTextColor
+    ctx.font = theme.compose.footerFontPrimary
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
-    ctx.fillText('EUORNA', PAD + 6, footerY + 40)
+    ctx.fillText('EUORNA', PAD + 12, footerY + 40)
   }
 
-  ctx.fillStyle = '#1a1412'
-  ctx.font = '24px "VT323", monospace'
+  ctx.fillStyle = theme.compose.footerTextColor
+  ctx.font = theme.compose.footerFontSecondary
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
+  const dateStr = new Date()
+    .toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: '2-digit' })
+    .toUpperCase()
   ctx.fillText(
-    new Date()
-      .toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: '2-digit' })
-      .toUpperCase(),
-    canvas.width - PAD - 6,
+    theme.id === 'y2k' ? `✦ ${dateStr} ✦` : dateStr,
+    canvas.width - PAD - 12,
     footerY + 40,
   )
 
-  // Light scanline overlay — prints nicely on cream paper
-  drawScanlines(ctx, canvas.width, canvas.height)
+  if (theme.compose.scanlineOverlay) drawScanlines(ctx, canvas.width, canvas.height)
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('compose toBlob failed'))), 'image/jpeg', 0.92)
@@ -168,7 +194,6 @@ function drawCover(
   const dr = dw / dh
   let sx = 0, sy = 0, sw = img.width, sh = img.height
   if (ir > dr) {
-    // image wider than frame — crop horizontally
     sw = img.height * dr
     sx = (img.width - sw) / 2
   } else {
@@ -195,6 +220,49 @@ function drawScanlines(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.globalAlpha = 0.05
   ctx.fillStyle = '#000'
   for (let y = 0; y < h; y += 3) ctx.fillRect(0, y, w, 1)
+  ctx.restore()
+}
+
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
+function drawStickers(
+  ctx: CanvasRenderingContext2D,
+  cols: number,
+  rows: number,
+  PAD: number,
+  GAP: number,
+  frameW: number,
+  frameH: number,
+) {
+  ctx.save()
+  const glyphs = ['✦', '♡', '✧', '★']
+  for (let i = 0; i < rows * cols; i++) {
+    const row = Math.floor(i / cols)
+    const col = i % cols
+    const x = PAD + col * (frameW + GAP)
+    const y = PAD + row * (frameH + GAP)
+    ctx.font = 'bold 52px "Fredoka", sans-serif'
+    ctx.fillStyle = 'rgba(255, 79, 161, 0.9)'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    const g = glyphs[i % glyphs.length]
+    ctx.fillText(g, x + frameW - 24, y + 24)
+  }
   ctx.restore()
 }
 

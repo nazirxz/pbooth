@@ -7,7 +7,7 @@ export function BootScreen() {
   const goTo = useSession((s) => s.goTo)
 
   useEffect(() => {
-    const t = setTimeout(() => goTo('home'), 2600)
+    const t = setTimeout(() => goTo('theme-select'), 2600)
     return () => clearTimeout(t)
   }, [goTo])
 

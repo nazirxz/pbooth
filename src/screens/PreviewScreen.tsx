@@ -3,6 +3,7 @@ import QRCode from 'qrcode'
 import { ChannelBar } from '@/components/ChannelBar'
 import { TVButton } from '@/components/TVButton'
 import { useSession } from '@/state/session-store'
+import { useTheme } from '@/state/theme-store'
 import { composeStrip } from '@/lib/compose'
 import { uploadComposed } from '@/lib/supabase/photos'
 import { dbUpdateSession } from '@/lib/supabase/sessions'
@@ -15,6 +16,7 @@ export function PreviewScreen() {
   const composed = useSession((s) => s.composed)
   const setComposed = useSession((s) => s.setComposed)
   const reset = useSession((s) => s.reset)
+  const theme = useTheme((s) => s.theme)
 
   const [qrImg, setQrImg] = useState<string>('')
   const [uploadState, setUploadState] = useState<'idle' | 'composing' | 'uploading' | 'ready' | 'local-only' | 'error'>('idle')
@@ -26,7 +28,7 @@ export function PreviewScreen() {
     ;(async () => {
       try {
         setUploadState('composing')
-        const blob = await composeStrip({ photos, template, filter })
+        const blob = await composeStrip({ photos, template, filterId: filter, theme })
         if (cancelled) return
         const dataUrl = await blobToDataUrl(blob)
 
@@ -65,7 +67,7 @@ export function PreviewScreen() {
     return () => {
       cancelled = true
     }
-  }, [composed, photos, template, filter, sessionId, setComposed])
+  }, [composed, photos, template, filter, sessionId, setComposed, theme])
 
   const download = () => {
     if (!composed) return
