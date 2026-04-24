@@ -18,13 +18,13 @@ export const appConfig = {
   },
   capture: {
     frameCount: 4,
-    countdownSec: 3,
+    countdownSec: 5,
     delayBetweenFramesMs: 800,
   },
   payment: {
     enabled: true,
     provider: 'mock' as 'mock' | 'qris' | 'midtrans',
-    amount: 15_000,
+    amount: 30_000,
     currency: 'IDR',
     timeoutSec: 300,
     devSkipButton: true,

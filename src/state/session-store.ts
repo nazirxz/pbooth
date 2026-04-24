@@ -4,7 +4,6 @@ import type { PaymentSession } from '@/lib/payment'
 
 export type ScreenId =
   | 'boot'
-  | 'theme-select'
   | 'home'
   | 'payment'
   | 'template'
@@ -69,5 +68,5 @@ export const useSession = create<SessionState>((set) => ({
   addPhoto: (photo) => set((s) => ({ photos: [...s.photos, photo] })),
   clearPhotos: () => set({ photos: [] }),
   setComposed: (composed) => set({ composed }),
-  reset: () => set({ ...initial, screen: 'theme-select' }),
+  reset: () => set({ ...initial, screen: 'home' }),
 }))

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type ThemeId = 'retro' | 'y2k'
+export type ThemeId = 'retro'
 
 export interface ThemeFilter {
   id: string

@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { ChannelBar } from '@/components/ChannelBar'
 import { TVButton } from '@/components/TVButton'
-import { appConfig } from '@/config/app-config'
 import { useSession, type CapturedPhoto } from '@/state/session-store'
 import { useDecoration, type PlacedSticker } from '@/state/decoration-store'
 import { useTheme } from '@/state/theme-store'
 import { BORDERS, bordersForTheme, getBorder } from '@/lib/borders'
 import { STICKERS, getSticker } from '@/lib/stickers'
+import { computePaperLayout, type PaperLayout } from '@/lib/strip-layout'
 
 type Tab = 'border' | 'sticker'
 
@@ -31,14 +31,12 @@ export function DecorateScreen() {
 
   const [tab, setTab] = useState<Tab>('border')
 
-  // Reset decoration for a fresh session — default border adapts to theme.
+  // Reset decoration for a fresh session.
   useEffect(() => {
-    resetDecoration(theme.id === 'y2k' ? 'pink-gradient' : 'classic-black')
-  }, [resetDecoration, theme.id])
+    resetDecoration('classic-black')
+  }, [resetDecoration])
 
-  const tmpl = appConfig.templates.find((t) => t.id === template)!
-  const { stripSize } = useMemo(() => stripGeometry(tmpl.layout, tmpl.frames), [tmpl])
-
+  const layout = useMemo(() => computePaperLayout(template), [template])
   const availableBorders = useMemo(() => bordersForTheme(theme.id), [theme.id])
 
   return (
@@ -49,8 +47,7 @@ export function DecorateScreen() {
         <StripStage
           photos={photos}
           filterId={filter}
-          template={tmpl.id}
-          stripSize={stripSize}
+          layout={layout}
           borderId={borderId}
           themeId={theme.id}
           stickers={stickers}
@@ -126,8 +123,7 @@ function TabButton({
 function StripStage(props: {
   photos: CapturedPhoto[]
   filterId: string
-  template: string
-  stripSize: { w: number; h: number }
+  layout: PaperLayout
   borderId: string
   themeId: string
   stickers: PlacedSticker[]
@@ -140,7 +136,7 @@ function StripStage(props: {
   const {
     photos,
     filterId,
-    stripSize,
+    layout,
     borderId,
     themeId,
     stickers,
@@ -154,43 +150,54 @@ function StripStage(props: {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
 
-  // Paint paper + photos + border into preview canvas.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    canvas.width = stripSize.w
-    canvas.height = stripSize.h
+    canvas.width = layout.paper.w
+    canvas.height = layout.paper.h
     const ctx = canvas.getContext('2d')!
 
     // paper
-    ctx.fillStyle = themeId === 'y2k' ? '#ffffff' : '#f5e6c8'
+    ctx.fillStyle = '#f5e6c8'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-    const frames = frameLayout(stripSize.w, stripSize.h)
-
-    // Draw each captured photo into its slot (with CSS filter via canvas `filter`)
     const filterCss = FILTER_CSS_MAP[filterId] ?? 'none'
-    ctx.filter = filterCss
-    for (let i = 0; i < frames.length; i++) {
-      const f = frames[i]
-      const p = photos[i]
-      if (!p) continue
-      const img = new Image()
-      img.src = p.dataUrl
-      // Synchronous draw once loaded — we redraw when any dep changes, so this is fine.
-      img.onload = () => drawCover(ctx, img, f.x, f.y, f.w, f.h)
-      if (img.complete) drawCover(ctx, img, f.x, f.y, f.w, f.h)
-    }
-    ctx.filter = 'none'
 
-    // Redraw border after a tick to cover photo edges.
+    for (const section of layout.sections) {
+      ctx.filter = filterCss
+      for (let i = 0; i < section.frames.length; i++) {
+        const f = section.frames[i]
+        const p = photos[i]
+        if (!p) continue
+        const img = new Image()
+        img.src = p.dataUrl
+        img.onload = () => drawCover(ctx, img, f.x, f.y, f.w, f.h)
+        if (img.complete) drawCover(ctx, img, f.x, f.y, f.w, f.h)
+      }
+      ctx.filter = 'none'
+    }
+
+    // Redraw border + cut-line after a tick so they sit on top
     requestAnimationFrame(() => {
       const border = getBorder(borderId)
-      for (const f of frames) {
-        border.renderCanvas(ctx, { ...f, themeId })
+      for (const section of layout.sections) {
+        for (const f of section.frames) {
+          border.renderCanvas(ctx, { ...f, themeId })
+        }
+      }
+      if (layout.cutLine) {
+        ctx.save()
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)'
+        ctx.lineWidth = 1
+        ctx.setLineDash([8, 8])
+        ctx.beginPath()
+        ctx.moveTo(layout.cutLine.x, layout.cutLine.y1)
+        ctx.lineTo(layout.cutLine.x, layout.cutLine.y2)
+        ctx.stroke()
+        ctx.restore()
       }
     })
-  }, [photos, filterId, borderId, stripSize.w, stripSize.h, themeId])
+  }, [photos, filterId, borderId, layout, themeId])
 
   const handleStagePointerDown = (e: React.PointerEvent) => {
     // Tap on stage (outside a sticker) clears selection
@@ -202,7 +209,7 @@ function StripStage(props: {
       ref={stageRef}
       className="relative rounded-2xl overflow-hidden bg-crt-cream shadow-[0_0_40px_rgba(0,0,0,0.4)]"
       style={{
-        aspectRatio: `${stripSize.w} / ${stripSize.h}`,
+        aspectRatio: `${layout.paper.w} / ${layout.paper.h}`,
         height: '100%',
       }}
       onPointerDown={handleStagePointerDown}
@@ -430,40 +437,3 @@ function StickerGrid({ onPick }: { onPick: (assetId: string) => void }) {
   )
 }
 
-/* ─────────── Geometry helpers ─────────── */
-
-function stripGeometry(layout: string, frames: number): { stripSize: { w: number; h: number } } {
-  const PAD = 40
-  const GAP = 20
-  const FOOTER = 80
-  if (layout === 'grid') {
-    const frameW = 520, frameH = 390
-    return { stripSize: { w: PAD * 2 + 2 * frameW + GAP, h: PAD * 2 + 2 * frameH + GAP + FOOTER } }
-  }
-  const frameW = 600, frameH = 450
-  return { stripSize: { w: PAD * 2 + frameW, h: PAD * 2 + frames * frameH + (frames - 1) * GAP + FOOTER } }
-}
-
-function frameLayout(stripW: number, stripH: number): Array<{ x: number; y: number; w: number; h: number }> {
-  // Infer layout from ratio — matches compose.ts
-  const PAD = 40
-  const GAP = 20
-  const FOOTER = 80
-  // grid-2x2 is wider than tall
-  if (stripW > stripH) {
-    const cols = 2, rows = 2, frameW = 520, frameH = 390
-    const out = []
-    for (let i = 0; i < cols * rows; i++) {
-      const r = Math.floor(i / cols), c = i % cols
-      out.push({ x: PAD + c * (frameW + GAP), y: PAD + r * (frameH + GAP), w: frameW, h: frameH })
-    }
-    return out
-  }
-  const frameW = 600, frameH = 450
-  const rows = Math.round((stripH - PAD * 2 - FOOTER + GAP) / (frameH + GAP))
-  const out = []
-  for (let i = 0; i < rows; i++) {
-    out.push({ x: PAD, y: PAD + i * (frameH + GAP), w: frameW, h: frameH })
-  }
-  return out
-}

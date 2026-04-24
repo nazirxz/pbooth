@@ -1,8 +1,9 @@
-import { appConfig, type TemplateId } from '@/config/app-config'
+import { type TemplateId } from '@/config/app-config'
 import type { CapturedPhoto } from '@/state/session-store'
 import type { PlacedSticker } from '@/state/decoration-store'
 import { getBorder } from '@/lib/borders'
 import { getSticker } from '@/lib/stickers'
+import { computePaperLayout, type PaperLayout, type Rect } from '@/lib/strip-layout'
 import type { Theme } from '@/themes'
 import logoBlackUrl from '@/asset/euorna_black.jpeg'
 
@@ -11,7 +12,6 @@ interface ComposeOpts {
   template: TemplateId
   filterId: string
   theme: Theme
-  /** Optional decoration — when omitted, falls back to theme default border. */
   decoration?: {
     borderId: string
     stickers: PlacedSticker[]
@@ -32,114 +32,118 @@ async function getLogo(): Promise<HTMLImageElement> {
   return img
 }
 
+/**
+ * Composes captured photos into a 4R-ready JPEG. Strip templates print as
+ * two identical copies side-by-side so customers can cut and share.
+ */
 export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
-  const tmpl = appConfig.templates.find((t) => t.id === opts.template)!
+  const layout = computePaperLayout(opts.template)
   const imgs = await Promise.all(opts.photos.map(loadImage))
-  const { theme } = opts
 
   const canvas = document.createElement('canvas')
+  canvas.width = layout.paper.w
+  canvas.height = layout.paper.h
   const ctx = canvas.getContext('2d')!
 
-  const PAD = 40
-  const GAP = 20
-  const FOOTER = 80
-
-  let frameW: number
-  let frameH: number
-  let cols: number
-  let rows: number
-
-  if (tmpl.layout === 'grid') {
-    cols = 2
-    rows = 2
-    frameW = 520
-    frameH = 390
-  } else {
-    cols = 1
-    rows = tmpl.frames
-    frameW = 600
-    frameH = 450
-  }
-
-  canvas.width = PAD * 2 + cols * frameW + (cols - 1) * GAP
-  canvas.height = PAD * 2 + rows * frameH + (rows - 1) * GAP + FOOTER
-
-  // Paper background — solid for retro, gradient for y2k
-  if (theme.id === 'y2k') {
-    const grd = ctx.createLinearGradient(0, 0, canvas.width, canvas.height)
-    grd.addColorStop(0, '#ffe3f1')
-    grd.addColorStop(0.5, '#ffffff')
-    grd.addColorStop(1, '#e4f4ff')
-    ctx.fillStyle = grd
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-  } else {
-    ctx.fillStyle = theme.compose.paperBg
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-  }
-
-  if (theme.compose.noiseAmount > 0) {
-    drawNoise(ctx, canvas.width, canvas.height, theme.compose.noiseAmount)
-  }
-
-  const filterClass = theme.filters.find((f) => f.id === opts.filterId)
-  ctx.filter = filterClass?.css ?? 'none'
-
-  for (let i = 0; i < imgs.length && i < cols * rows; i++) {
-    const row = Math.floor(i / cols)
-    const col = i % cols
-    const x = PAD + col * (frameW + GAP)
-    const y = PAD + row * (frameH + GAP)
-    drawCover(ctx, imgs[i], x, y, frameW, frameH)
-  }
-
-  ctx.filter = 'none'
-
-  // Frame borders — driven by decoration.borderId, defaulting to theme-appropriate border.
-  const borderId =
-    opts.decoration?.borderId ?? (theme.id === 'y2k' ? 'pink-gradient' : 'classic-black')
-  const border = getBorder(borderId)
-  for (let i = 0; i < imgs.length && i < cols * rows; i++) {
-    const row = Math.floor(i / cols)
-    const col = i % cols
-    const x = PAD + col * (frameW + GAP)
-    const y = PAD + row * (frameH + GAP)
-    border.renderCanvas(ctx, { x, y, w: frameW, h: frameH, themeId: theme.id })
-  }
-
-  // Footer
-  const footerY = canvas.height - FOOTER + 10
-  if (theme.id === 'y2k') {
-    const footerGrad = ctx.createLinearGradient(0, footerY, canvas.width, footerY)
-    footerGrad.addColorStop(0, '#ffe3f1')
-    footerGrad.addColorStop(1, '#e4f4ff')
-    ctx.fillStyle = footerGrad
-    ctx.fillRect(PAD, footerY, canvas.width - PAD * 2, FOOTER - 14)
-  } else {
-    ctx.fillStyle = theme.compose.borderColor
-    ctx.fillRect(PAD, footerY, canvas.width - PAD * 2, 3)
+  // Paper background
+  ctx.fillStyle = opts.theme.compose.paperBg
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  if (opts.theme.compose.noiseAmount > 0) {
+    drawNoise(ctx, canvas.width, canvas.height, opts.theme.compose.noiseAmount)
   }
 
   const logo = await getLogo().catch(() => null)
+
+  // Draw each strip section
+  for (const section of layout.sections) {
+    drawSectionFrames(ctx, section, imgs, opts)
+    drawSectionFooter(ctx, section.footer, logo, opts.theme)
+  }
+
+  // Cut line for 2-up strips
+  if (layout.cutLine) {
+    ctx.save()
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([8, 8])
+    ctx.beginPath()
+    ctx.moveTo(layout.cutLine.x, layout.cutLine.y1)
+    ctx.lineTo(layout.cutLine.x, layout.cutLine.y2)
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  // Placed stickers (paper-level, drawn once on top of everything)
+  if (opts.decoration?.stickers?.length) {
+    drawPlacedStickers(ctx, canvas.width, canvas.height, opts.decoration.stickers)
+  }
+
+  if (opts.theme.compose.scanlineOverlay) {
+    drawScanlines(ctx, canvas.width, canvas.height)
+  }
+
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('compose toBlob failed'))), 'image/jpeg', 0.92)
+  })
+}
+
+function drawSectionFrames(
+  ctx: CanvasRenderingContext2D,
+  section: { frames: Rect[] },
+  imgs: HTMLImageElement[],
+  opts: ComposeOpts,
+) {
+  const filterCss = opts.theme.filters.find((f) => f.id === opts.filterId)?.css ?? 'none'
+  ctx.filter = filterCss
+  for (let i = 0; i < section.frames.length; i++) {
+    const f = section.frames[i]
+    const img = imgs[i]
+    if (!img) continue
+    drawCover(ctx, img, f.x, f.y, f.w, f.h)
+  }
+  ctx.filter = 'none'
+
+  const borderId = opts.decoration?.borderId ?? 'classic-black'
+  const border = getBorder(borderId)
+  for (const f of section.frames) {
+    border.renderCanvas(ctx, { x: f.x, y: f.y, w: f.w, h: f.h, themeId: opts.theme.id })
+  }
+}
+
+function drawSectionFooter(
+  ctx: CanvasRenderingContext2D,
+  footer: Rect,
+  logo: HTMLImageElement | null,
+  theme: Theme,
+) {
+  ctx.save()
+  // thin divider line at top of footer
+  ctx.fillStyle = theme.compose.borderColor
+  ctx.fillRect(footer.x + 10, footer.y, footer.w - 20, 2)
+
+  // logo
   if (logo) {
     const cropCenterY = 0.63
     const cropHeightPct = 0.22
     const srcY = logo.height * (cropCenterY - cropHeightPct / 2)
     const srcH = logo.height * cropHeightPct
-    const destH = 56
+    const destH = Math.min(50, footer.h * 0.42)
     const destW = destH * (logo.width / srcH)
-    const destY = footerY + (FOOTER - destH) / 2 - 2
+    const destX = footer.x + 20
+    const destY = footer.y + (footer.h - destH) / 2 - 4
     ctx.save()
     ctx.globalCompositeOperation = 'multiply'
-    ctx.drawImage(logo, 0, srcY, logo.width, srcH, PAD + 12, destY, destW, destH)
+    ctx.drawImage(logo, 0, srcY, logo.width, srcH, destX, destY, destW, destH)
     ctx.restore()
   } else {
     ctx.fillStyle = theme.compose.footerTextColor
     ctx.font = theme.compose.footerFontPrimary
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
-    ctx.fillText('EUORNA', PAD + 12, footerY + 40)
+    ctx.fillText('EUORNA', footer.x + 20, footer.y + footer.h / 2)
   }
 
+  // date on the right
   ctx.fillStyle = theme.compose.footerTextColor
   ctx.font = theme.compose.footerFontSecondary
   ctx.textAlign = 'right'
@@ -147,22 +151,8 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
   const dateStr = new Date()
     .toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: '2-digit' })
     .toUpperCase()
-  ctx.fillText(
-    theme.id === 'y2k' ? `✦ ${dateStr} ✦` : dateStr,
-    canvas.width - PAD - 12,
-    footerY + 40,
-  )
-
-  // Placed stickers (on top of everything)
-  if (opts.decoration?.stickers?.length) {
-    drawPlacedStickers(ctx, canvas.width, canvas.height, opts.decoration.stickers)
-  }
-
-  if (theme.compose.scanlineOverlay) drawScanlines(ctx, canvas.width, canvas.height)
-
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('compose toBlob failed'))), 'image/jpeg', 0.92)
-  })
+  ctx.fillText(dateStr, footer.x + footer.w - 20, footer.y + footer.h / 2 + 4)
+  ctx.restore()
 }
 
 function loadImage(photo: CapturedPhoto): Promise<HTMLImageElement> {
@@ -227,7 +217,7 @@ function drawPlacedStickers(
   for (const s of stickers) {
     const def = getSticker(s.assetId)
     if (!def) continue
-    const basePx = 72 * s.scale
+    const basePx = 92 * s.scale
     const px = s.x * canvasW
     const py = s.y * canvasH
     ctx.save()
@@ -244,3 +234,5 @@ function drawPlacedStickers(
 function clamp(v: number) {
   return v < 0 ? 0 : v > 255 ? 255 : v
 }
+
+export type { PaperLayout }
