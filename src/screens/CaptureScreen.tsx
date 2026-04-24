@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import clsx from 'clsx'
 import { ChannelBar } from '@/components/ChannelBar'
+import { RetroCountdown } from '@/components/RetroCountdown'
 import { appConfig } from '@/config/app-config'
 import { useSession } from '@/state/session-store'
 import { createCameraSource } from '@/lib/camera'
@@ -84,20 +85,11 @@ export function CaptureScreen() {
             style={{ transform: 'scaleX(-1)' }}
           />
 
-          <AnimatePresence>
+          <AnimatePresence mode="wait">
             {countdown !== null && (
-              <motion.div
-                key={countdown}
-                initial={{ scale: 2, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.5, opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="absolute inset-0 flex items-center justify-center"
-              >
-                <div className="font-pixel text-[14rem] text-crt-phosphor rgb-split drop-shadow-[0_0_20px_rgba(57,255,20,0.6)]">
-                  {countdown}
-                </div>
-              </motion.div>
+              <div key={countdown} className="absolute inset-0 flex items-center justify-center">
+                <RetroCountdown value={countdown} durationMs={1000} />
+              </div>
             )}
           </AnimatePresence>
 
