@@ -1,5 +1,8 @@
 import { appConfig, type TemplateId } from '@/config/app-config'
 import type { CapturedPhoto } from '@/state/session-store'
+import type { PlacedSticker } from '@/state/decoration-store'
+import { getBorder } from '@/lib/borders'
+import { getSticker } from '@/lib/stickers'
 import type { Theme } from '@/themes'
 import logoBlackUrl from '@/asset/euorna_black.jpeg'
 
@@ -8,6 +11,11 @@ interface ComposeOpts {
   template: TemplateId
   filterId: string
   theme: Theme
+  /** Optional decoration — when omitted, falls back to theme default border. */
+  decoration?: {
+    borderId: string
+    stickers: PlacedSticker[]
+  }
 }
 
 let cachedLogo: HTMLImageElement | null = null
@@ -35,7 +43,6 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
   const PAD = 40
   const GAP = 20
   const FOOTER = 80
-  const FRAME_BORDER = theme.id === 'y2k' ? 5 : 4
 
   let frameW: number
   let frameH: number
@@ -87,36 +94,16 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
 
   ctx.filter = 'none'
 
-  // Frame borders — retro: sharp black; y2k: gradient pink/purple stroke
-  if (theme.id === 'y2k') {
-    for (let i = 0; i < imgs.length && i < cols * rows; i++) {
-      const row = Math.floor(i / cols)
-      const col = i % cols
-      const x = PAD + col * (frameW + GAP)
-      const y = PAD + row * (frameH + GAP)
-      const strokeGrad = ctx.createLinearGradient(x, y, x + frameW, y + frameH)
-      strokeGrad.addColorStop(0, '#ff4fa1')
-      strokeGrad.addColorStop(1, '#93e9ff')
-      ctx.strokeStyle = strokeGrad
-      ctx.lineWidth = FRAME_BORDER
-      roundRect(ctx, x - FRAME_BORDER / 2, y - FRAME_BORDER / 2, frameW + FRAME_BORDER, frameH + FRAME_BORDER, 18)
-      ctx.stroke()
-    }
-  } else {
-    ctx.strokeStyle = theme.compose.borderColor
-    ctx.lineWidth = FRAME_BORDER
-    for (let i = 0; i < imgs.length && i < cols * rows; i++) {
-      const row = Math.floor(i / cols)
-      const col = i % cols
-      const x = PAD + col * (frameW + GAP)
-      const y = PAD + row * (frameH + GAP)
-      ctx.strokeRect(x, y, frameW, frameH)
-    }
-  }
-
-  // Y2K: sprinkle stickers at frame corners
-  if (theme.id === 'y2k') {
-    drawStickers(ctx, cols, rows, PAD, GAP, frameW, frameH)
+  // Frame borders — driven by decoration.borderId, defaulting to theme-appropriate border.
+  const borderId =
+    opts.decoration?.borderId ?? (theme.id === 'y2k' ? 'pink-gradient' : 'classic-black')
+  const border = getBorder(borderId)
+  for (let i = 0; i < imgs.length && i < cols * rows; i++) {
+    const row = Math.floor(i / cols)
+    const col = i % cols
+    const x = PAD + col * (frameW + GAP)
+    const y = PAD + row * (frameH + GAP)
+    border.renderCanvas(ctx, { x, y, w: frameW, h: frameH, themeId: theme.id })
   }
 
   // Footer
@@ -165,6 +152,11 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
     canvas.width - PAD - 12,
     footerY + 40,
   )
+
+  // Placed stickers (on top of everything)
+  if (opts.decoration?.stickers?.length) {
+    drawPlacedStickers(ctx, canvas.width, canvas.height, opts.decoration.stickers)
+  }
 
   if (theme.compose.scanlineOverlay) drawScanlines(ctx, canvas.width, canvas.height)
 
@@ -223,45 +215,28 @@ function drawScanlines(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.restore()
 }
 
-function roundRect(
+function drawPlacedStickers(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-) {
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.arcTo(x + w, y, x + w, y + h, r)
-  ctx.arcTo(x + w, y + h, x, y + h, r)
-  ctx.arcTo(x, y + h, x, y, r)
-  ctx.arcTo(x, y, x + w, y, r)
-  ctx.closePath()
-}
-
-function drawStickers(
-  ctx: CanvasRenderingContext2D,
-  cols: number,
-  rows: number,
-  PAD: number,
-  GAP: number,
-  frameW: number,
-  frameH: number,
+  canvasW: number,
+  canvasH: number,
+  stickers: PlacedSticker[],
 ) {
   ctx.save()
-  const glyphs = ['✦', '♡', '✧', '★']
-  for (let i = 0; i < rows * cols; i++) {
-    const row = Math.floor(i / cols)
-    const col = i % cols
-    const x = PAD + col * (frameW + GAP)
-    const y = PAD + row * (frameH + GAP)
-    ctx.font = 'bold 52px "Fredoka", sans-serif'
-    ctx.fillStyle = 'rgba(255, 79, 161, 0.9)'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    const g = glyphs[i % glyphs.length]
-    ctx.fillText(g, x + frameW - 24, y + 24)
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  for (const s of stickers) {
+    const def = getSticker(s.assetId)
+    if (!def) continue
+    const basePx = 72 * s.scale
+    const px = s.x * canvasW
+    const py = s.y * canvasH
+    ctx.save()
+    ctx.translate(px, py)
+    ctx.rotate(s.rotation)
+    ctx.font = `bold ${basePx}px "Fredoka", "Apple Color Emoji", "Segoe UI Emoji", sans-serif`
+    if (def.color) ctx.fillStyle = def.color
+    ctx.fillText(def.glyph, 0, 0)
+    ctx.restore()
   }
   ctx.restore()
 }

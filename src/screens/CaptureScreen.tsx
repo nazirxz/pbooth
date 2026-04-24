@@ -58,7 +58,7 @@ export function CaptureScreen() {
 
       if (!cancelled) {
         await wait(400)
-        goTo('preview')
+        goTo('decorate')
       }
     }
 

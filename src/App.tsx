@@ -8,6 +8,7 @@ import { PaymentScreen } from '@/screens/PaymentScreen'
 import { TemplateScreen } from '@/screens/TemplateScreen'
 import { FilterScreen } from '@/screens/FilterScreen'
 import { CaptureScreen } from '@/screens/CaptureScreen'
+import { DecorateScreen } from '@/screens/DecorateScreen'
 import { PreviewScreen } from '@/screens/PreviewScreen'
 
 export default function App() {
@@ -60,6 +61,7 @@ function renderScreen(s: ScreenId) {
     case 'template': return <TemplateScreen />
     case 'filter': return <FilterScreen />
     case 'capture': return <CaptureScreen />
+    case 'decorate': return <DecorateScreen />
     case 'preview': return <PreviewScreen />
   }
 }

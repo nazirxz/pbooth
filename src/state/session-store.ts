@@ -10,6 +10,7 @@ export type ScreenId =
   | 'template'
   | 'filter'
   | 'capture'
+  | 'decorate'
   | 'preview'
 
 export interface CapturedPhoto {

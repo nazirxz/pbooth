@@ -4,6 +4,7 @@ import { ChannelBar } from '@/components/ChannelBar'
 import { TVButton } from '@/components/TVButton'
 import { useSession } from '@/state/session-store'
 import { useTheme } from '@/state/theme-store'
+import { useDecoration } from '@/state/decoration-store'
 import { composeStrip } from '@/lib/compose'
 import { uploadComposed } from '@/lib/supabase/photos'
 import { dbUpdateSession } from '@/lib/supabase/sessions'
@@ -17,6 +18,8 @@ export function PreviewScreen() {
   const setComposed = useSession((s) => s.setComposed)
   const reset = useSession((s) => s.reset)
   const theme = useTheme((s) => s.theme)
+  const borderId = useDecoration((s) => s.borderId)
+  const placedStickers = useDecoration((s) => s.stickers)
 
   const [qrImg, setQrImg] = useState<string>('')
   const [uploadState, setUploadState] = useState<'idle' | 'composing' | 'uploading' | 'ready' | 'local-only' | 'error'>('idle')
@@ -28,7 +31,13 @@ export function PreviewScreen() {
     ;(async () => {
       try {
         setUploadState('composing')
-        const blob = await composeStrip({ photos, template, filterId: filter, theme })
+        const blob = await composeStrip({
+          photos,
+          template,
+          filterId: filter,
+          theme,
+          decoration: { borderId, stickers: placedStickers },
+        })
         if (cancelled) return
         const dataUrl = await blobToDataUrl(blob)
 
@@ -67,7 +76,7 @@ export function PreviewScreen() {
     return () => {
       cancelled = true
     }
-  }, [composed, photos, template, filter, sessionId, setComposed, theme])
+  }, [composed, photos, template, filter, sessionId, setComposed, theme, borderId, placedStickers])
 
   const download = () => {
     if (!composed) return
