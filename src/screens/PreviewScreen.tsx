@@ -80,17 +80,21 @@ export function PreviewScreen() {
       <ChannelBar channel="06" label="PREVIEW" />
 
       <div className="grid grid-cols-[auto_1fr] gap-10 px-14 pb-4 min-h-0">
-        <div className="bg-crt-cream p-4 rounded-2xl shadow-[0_0_30px_rgba(245,230,200,0.15)] flex items-center justify-center">
+        <div className="h-full bg-crt-cream p-3 rounded-2xl shadow-[0_0_30px_rgba(245,230,200,0.15)] flex items-center justify-center overflow-hidden">
           {composed ? (
-            <img src={composed.dataUrl} alt="Composed strip" className="h-full max-h-full object-contain" />
+            <img
+              src={composed.dataUrl}
+              alt="Composed strip"
+              className="block h-full w-auto object-contain"
+            />
           ) : (
-            <div className="w-[280px] h-[380px] grid place-items-center font-crt text-xl text-black/60">
+            <div className="w-[260px] h-[360px] grid place-items-center font-crt text-xl text-black/60">
               COMPOSING...
             </div>
           )}
         </div>
 
-        <div className="flex flex-col gap-6 justify-center">
+        <div className="flex flex-col gap-6 justify-center min-w-0">
           <div className="font-pixel text-5xl text-crt-phosphor rgb-split leading-tight">YOUR STRIP</div>
           <div className="font-crt text-2xl text-crt-cream/80 tracking-widest">
             LOOKING GOOD ✦
