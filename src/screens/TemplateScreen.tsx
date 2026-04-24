@@ -78,8 +78,8 @@ function TemplateThumb({ id }: { id: string }) {
       </div>
     )
   return (
-    <div className={clsx(common, 'grid-cols-2 grid-rows-2 w-32 h-32')}>
-      {[0, 1, 2, 3].map((i) => (
+    <div className={clsx(common, 'grid-rows-2 w-24 h-40')}>
+      {[0, 1].map((i) => (
         <div key={i} className="bg-crt-cream/20 rounded-sm" />
       ))}
     </div>

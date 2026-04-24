@@ -5,12 +5,11 @@ import { appConfig, type TemplateId } from '@/config/app-config'
  * (live preview). All coordinates are in paper pixel space at 300 DPI.
  *
  * 4R physical size  : 10.2 × 15.2 cm
- * 300 DPI pixel size: 1200 × 1800 (portrait) or 1800 × 1200 (landscape)
+ * 300 DPI pixel size: 1200 × 1800 (portrait)
  *
- * Strip templates (strip-3, strip-4) print as a classic "2-up" — two identical
- * strips side-by-side on one 4R sheet, meant to be cut in half so each customer
- * gets two copies (one to keep, one to share). Grid templates use the full
- * 4R landscape canvas.
+ * All current templates print as a classic "2-up" — two identical strips
+ * side-by-side on one 4R sheet, meant to be cut in half so each customer
+ * gets two copies (one to keep, one to share).
  */
 
 export interface Rect {
@@ -38,14 +37,9 @@ export interface PaperLayout {
 }
 
 const PAPER_PORTRAIT = { w: 1200, h: 1800 }
-const PAPER_LANDSCAPE = { w: 1800, h: 1200 }
 
 export function computePaperLayout(templateId: TemplateId): PaperLayout {
   const tmpl = appConfig.templates.find((t) => t.id === templateId)!
-
-  if (tmpl.layout === 'grid') {
-    return landscapeGridLayout(tmpl.frames)
-  }
   return portraitStripLayout(tmpl.frames)
 }
 
@@ -93,41 +87,3 @@ function portraitStripLayout(frameCount: number): PaperLayout {
   }
 }
 
-function landscapeGridLayout(frameCount: number): PaperLayout {
-  const { w: PW, h: PH } = PAPER_LANDSCAPE
-  const OUTER = 60
-  const GAP = 24
-  const FOOTER_H = 110
-
-  const cols = 2
-  const rows = Math.ceil(frameCount / cols)
-
-  const gridW = PW - OUTER * 2
-  const gridH = PH - OUTER * 2 - FOOTER_H
-  const cellW = (gridW - GAP * (cols - 1)) / cols
-  const cellH = (gridH - GAP * (rows - 1)) / rows
-
-  const frames: Rect[] = []
-  for (let i = 0; i < frameCount; i++) {
-    const r = Math.floor(i / cols)
-    const c = i % cols
-    frames.push({
-      x: OUTER + c * (cellW + GAP),
-      y: OUTER + r * (cellH + GAP),
-      w: cellW,
-      h: cellH,
-    })
-  }
-
-  const section: StripSection = {
-    bounds: { x: 0, y: 0, w: PW, h: PH },
-    frames,
-    footer: { x: OUTER, y: PH - OUTER - FOOTER_H, w: PW - OUTER * 2, h: FOOTER_H },
-  }
-
-  return {
-    paper: PAPER_LANDSCAPE,
-    orientation: 'landscape',
-    sections: [section],
-  }
-}

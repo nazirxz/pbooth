@@ -39,7 +39,7 @@ export const appConfig = {
   templates: [
     { id: 'strip-4', label: 'CLASSIC STRIP', frames: 4, layout: 'vertical' },
     { id: 'strip-3', label: 'TRIO', frames: 3, layout: 'vertical' },
-    { id: 'grid-2x2', label: 'QUAD', frames: 4, layout: 'grid' },
+    { id: 'duo-2', label: 'DUO', frames: 2, layout: 'vertical' },
   ],
   filters: [
     { id: 'none', label: 'NORMAL' },
