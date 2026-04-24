@@ -26,10 +26,7 @@ export function HomeScreen() {
             <br />
             BOOTH
           </div>
-          <div className="mt-6 font-crt text-3xl text-crt-cream/85 tracking-widest">
-            RETRO TV EDITION
-          </div>
-          <div className="mt-3 font-crt text-2xl text-crt-amber/90 tracking-widest">
+          <div className="mt-6 font-crt text-2xl text-crt-amber/90 tracking-widest">
             {appConfig.payment.enabled
               ? `RP ${appConfig.payment.amount.toLocaleString('id-ID')} / SESSION`
               : 'FREE MODE'}
