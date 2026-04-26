@@ -1,4 +1,5 @@
 import { appConfig } from '@/config/app-config'
+import { getSelectedDeviceId } from '@/state/device-store'
 import type { CameraSource } from './types'
 
 export class WebcamSource implements CameraSource {
@@ -7,14 +8,37 @@ export class WebcamSource implements CameraSource {
 
   async start(): Promise<MediaStream> {
     if (this.stream) return this.stream
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: appConfig.camera.webcam.facingMode,
-        width: { ideal: appConfig.camera.webcam.width },
-        height: { ideal: appConfig.camera.webcam.height },
-      },
-      audio: false,
-    })
+    const deviceId = getSelectedDeviceId()
+    const videoConstraints: MediaTrackConstraints = {
+      width: { ideal: appConfig.camera.webcam.width },
+      height: { ideal: appConfig.camera.webcam.height },
+    }
+    if (deviceId) {
+      videoConstraints.deviceId = { exact: deviceId }
+    } else {
+      videoConstraints.facingMode = appConfig.camera.webcam.facingMode
+    }
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraints,
+        audio: false,
+      })
+    } catch (e) {
+      // Stored deviceId no longer valid (cable unplugged etc.) — fall back to default.
+      if (deviceId) {
+        console.warn('[camera] selected device unavailable, falling back to default', e)
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: appConfig.camera.webcam.facingMode,
+            width: { ideal: appConfig.camera.webcam.width },
+            height: { ideal: appConfig.camera.webcam.height },
+          },
+          audio: false,
+        })
+      } else {
+        throw e
+      }
+    }
     return this.stream
   }
 

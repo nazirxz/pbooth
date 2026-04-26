@@ -5,6 +5,7 @@ import type { PaymentSession } from '@/lib/payment'
 export type ScreenId =
   | 'boot'
   | 'home'
+  | 'settings'
   | 'payment'
   | 'template'
   | 'filter'

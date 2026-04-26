@@ -10,6 +10,7 @@ import { FilterScreen } from '@/screens/FilterScreen'
 import { CaptureScreen } from '@/screens/CaptureScreen'
 import { DecorateScreen } from '@/screens/DecorateScreen'
 import { PreviewScreen } from '@/screens/PreviewScreen'
+import { SettingsScreen } from '@/screens/SettingsScreen'
 
 export default function App() {
   const screen = useSession((s) => s.screen)
@@ -52,6 +53,7 @@ function renderScreen(s: ScreenId) {
   switch (s) {
     case 'boot': return <BootScreen />
     case 'home': return <HomeScreen />
+    case 'settings': return <SettingsScreen />
     case 'payment': return <PaymentScreen />
     case 'template': return <TemplateScreen />
     case 'filter': return <FilterScreen />

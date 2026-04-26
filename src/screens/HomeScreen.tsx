@@ -48,10 +48,18 @@ export function HomeScreen() {
         </motion.div>
       </div>
 
-      <div className="px-10 pb-5 flex justify-between font-crt text-lg text-crt-cream/50 tracking-wider">
+      <div className="px-10 pb-5 flex justify-between items-center font-crt text-lg text-crt-cream/50 tracking-wider">
         <span>CH 01 / WELCOME</span>
         <span>STEREO · NTSC</span>
       </div>
+
+      <button
+        onClick={() => goTo('settings')}
+        aria-label="Settings"
+        className="absolute bottom-4 right-4 w-12 h-12 rounded-full border border-crt-cream/25 bg-black/40 text-crt-cream/55 hover:text-crt-cream hover:border-crt-cream/60 transition-colors flex items-center justify-center text-xl touch-press"
+      >
+        ⚙
+      </button>
     </div>
   )
 }
