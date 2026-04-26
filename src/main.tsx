@@ -1,31 +1,25 @@
-import React, { Suspense, lazy } from 'react'
+import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { SharePage } from './share/SharePage'
 import './styles/global.css'
 
 if (typeof window !== 'undefined' && (window as any).pbooth) {
   document.documentElement.classList.add('kiosk')
 }
 
-const SharePage = lazy(() =>
-  import('./share/SharePage').then((m) => ({ default: m.SharePage })),
-)
-
 const path = window.location.pathname
-const shareMatch = path.match(/^\/s\/([a-zA-Z0-9-]+)/)
+const shareMatch = path.match(/^\/s\/([^/?#]+)/)
 
 if (shareMatch) {
   document.documentElement.classList.add('share-mode')
 }
 
+// Visible in console so you can sanity-check routing on a phone via remote debug.
+console.log('[pbooth] route', { path, sharedSessionId: shareMatch?.[1] ?? null })
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {shareMatch ? (
-      <Suspense fallback={null}>
-        <SharePage sessionId={shareMatch[1]} />
-      </Suspense>
-    ) : (
-      <App />
-    )}
+    {shareMatch ? <SharePage sessionId={shareMatch[1]} /> : <App />}
   </React.StrictMode>,
 )
