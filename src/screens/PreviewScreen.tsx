@@ -31,6 +31,7 @@ export function PreviewScreen() {
   const placedStickers = useDecoration((s) => s.stickers)
 
   const [qrImg, setQrImg] = useState<string>('')
+  const [shareUrl, setShareUrl] = useState<string>('')
   const [uploadState, setUploadState] = useState<UploadState>('idle')
 
   // Generate the QR as soon as we have a sessionId — independent of upload
@@ -38,9 +39,10 @@ export function PreviewScreen() {
   // and re-fetches itself if the user reloads, so customers can scan early.
   useEffect(() => {
     if (!sessionId) return
-    const shareUrl = `${window.location.origin}/s/${sessionId}`
+    const url = `${window.location.origin}/s/${sessionId}`
+    setShareUrl(url)
     let cancelled = false
-    QRCode.toDataURL(shareUrl, {
+    QRCode.toDataURL(url, {
       width: 320,
       margin: 1,
       color: { dark: '#1a1412', light: '#f5e6c8' },
@@ -144,7 +146,7 @@ export function PreviewScreen() {
             LOOKING GOOD ✦
           </div>
 
-          <QRPanel state={uploadState} qrImg={qrImg} sessionId={sessionId} />
+          <QRPanel state={uploadState} qrImg={qrImg} sessionId={sessionId} shareUrl={shareUrl} />
 
           <div className="flex gap-4 flex-wrap mt-2">
             <TVButton variant="secondary" size="md" onClick={download} disabled={!composed}>
@@ -164,21 +166,41 @@ function QRPanel({
   state,
   qrImg,
   sessionId,
+  shareUrl,
 }: {
   state: UploadState
   qrImg: string
   sessionId: string | null
+  shareUrl: string
 }) {
   // Show QR as soon as we have one — the share page handles partial state.
   if (qrImg && sessionId) {
     return (
-      <div className="flex items-center gap-4 bg-black/40 border-2 border-crt-cream/30 rounded-xl p-4">
-        <img src={qrImg} alt="Download QR" className="w-28 h-28 bg-crt-cream rounded" />
-        <div className="font-crt text-crt-cream">
-          <div className="text-2xl text-crt-phosphor tracking-widest">SCAN UNTUK FOTO</div>
-          <div className="text-lg opacity-80 mt-1">RAW + STRIP + LIVE</div>
-          <UploadStatusInline state={state} />
+      <div className="bg-black/40 border-2 border-crt-cream/30 rounded-xl p-4 flex flex-col gap-3 max-w-md">
+        <div className="flex items-center gap-4">
+          <img src={qrImg} alt="Download QR" className="w-28 h-28 bg-crt-cream rounded" />
+          <div className="font-crt text-crt-cream">
+            <div className="text-2xl text-crt-phosphor tracking-widest">SCAN UNTUK FOTO</div>
+            <div className="text-lg opacity-80 mt-1">RAW + STRIP + LIVE</div>
+            <UploadStatusInline state={state} />
+          </div>
         </div>
+        {shareUrl && (
+          <div className="border-t border-crt-cream/15 pt-2">
+            <div className="font-crt text-xs text-crt-cream/40 tracking-widest mb-1">
+              ATAU BUKA LINK INI
+            </div>
+            <a
+              href={shareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block font-mono text-xs text-crt-amber/85 break-all leading-snug select-text touch-press"
+              style={{ pointerEvents: 'auto' }}
+            >
+              {shareUrl}
+            </a>
+          </div>
+        )}
       </div>
     )
   }
