@@ -29,6 +29,8 @@ interface SessionState {
   sessionId: string | null
   paymentRowId: string | null
   payment: PaymentSession | null
+  /** Timestamp (ms) when payment was confirmed paid. Drives the 5-min session timer. */
+  paidAt: number | null
   template: TemplateId
   filter: FilterId
   photos: CapturedPhoto[]
@@ -38,6 +40,7 @@ interface SessionState {
   setSessionId: (id: string | null) => void
   setPaymentRowId: (id: string | null) => void
   setPayment: (p: PaymentSession | null) => void
+  markPaid: () => void
   setTemplate: (t: TemplateId) => void
   setFilter: (f: FilterId) => void
   addPhoto: (photo: CapturedPhoto) => void
@@ -51,6 +54,7 @@ const initial = {
   sessionId: null,
   paymentRowId: null,
   payment: null,
+  paidAt: null as number | null,
   template: 'duo-2' as TemplateId,
   filter: 'none' as FilterId,
   photos: [] as CapturedPhoto[],
@@ -63,6 +67,7 @@ export const useSession = create<SessionState>((set) => ({
   setSessionId: (sessionId) => set({ sessionId }),
   setPaymentRowId: (paymentRowId) => set({ paymentRowId }),
   setPayment: (payment) => set({ payment }),
+  markPaid: () => set({ paidAt: Date.now() }),
   setTemplate: (template) => set({ template }),
   setFilter: (filter) => set({ filter }),
   addPhoto: (photo) => set((s) => ({ photos: [...s.photos, photo] })),

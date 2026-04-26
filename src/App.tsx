@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { CRTFrame } from '@/components/CRTFrame'
+import { SessionTimer } from '@/components/SessionTimer'
 import { useSession, type ScreenId } from '@/state/session-store'
 import { BootScreen } from '@/screens/BootScreen'
 import { HomeScreen } from '@/screens/HomeScreen'
@@ -20,6 +21,7 @@ export default function App() {
         {usesFrame ? (
           <CRTFrame>
             <ScreenSwitcher screen={screen} />
+            <SessionTimer />
           </CRTFrame>
         ) : (
           <ScreenSwitcher screen={screen} />

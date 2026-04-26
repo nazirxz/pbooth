@@ -14,6 +14,7 @@ export function PaymentScreen() {
   const setPayment = useSession((s) => s.setPayment)
   const setSessionId = useSession((s) => s.setSessionId)
   const setPaymentRowId = useSession((s) => s.setPaymentRowId)
+  const markPaid = useSession((s) => s.markPaid)
 
   const [session, setSession] = useState<PaymentSession | null>(null)
   const [qrImg, setQrImg] = useState<string>('')
@@ -72,6 +73,7 @@ export function PaymentScreen() {
           await dbUpdatePaymentStatus(paymentRowIdRef.current, newStatus)
         }
         if (newStatus === 'paid') {
+          markPaid()
           if (sessionIdRef.current) await dbUpdateSession(sessionIdRef.current, { status: 'paid' })
           setTimeout(() => goTo('template'), 900)
         }
@@ -82,7 +84,7 @@ export function PaymentScreen() {
       mounted = false
       unsubRef.current?.()
     }
-  }, [goTo, setPayment, setSessionId, setPaymentRowId])
+  }, [goTo, setPayment, setSessionId, setPaymentRowId, markPaid])
 
   useEffect(() => {
     if (!session) return
