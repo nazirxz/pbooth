@@ -7,9 +7,9 @@ import { appConfig, type TemplateId } from '@/config/app-config'
  * 4R physical size  : 10.2 × 15.2 cm
  * 300 DPI pixel size: 1200 × 1800 (portrait)
  *
- * All current templates print as a classic "2-up" — two identical strips
- * side-by-side on one 4R sheet, meant to be cut in half so each customer
- * gets two copies (one to keep, one to share).
+ * All templates render as a single full-width strip on the 4R sheet —
+ * one column of N photos with a footer. drawCover crops the source webcam
+ * image to fit each frame, so face crop will tighten as N grows.
  */
 
 export interface Rect {
@@ -45,45 +45,34 @@ export function computePaperLayout(templateId: TemplateId): PaperLayout {
 
 function portraitStripLayout(frameCount: number): PaperLayout {
   const { w: PW, h: PH } = PAPER_PORTRAIT
-  const OUTER = 40
-  const GUTTER = 24
-  const STRIP_W = (PW - OUTER * 2 - GUTTER) / 2        // one strip's width
-  const INNER_PAD = 20                                  // pad inside a strip
-  const FRAME_GAP = 18
-  const FOOTER_H = 120
+  const OUTER = 60
+  const FRAME_GAP = 20
+  const FOOTER_H = 130
 
-  const sections: StripSection[] = []
+  const photoAreaH = PH - OUTER * 2 - FOOTER_H
+  const frameW = PW - OUTER * 2
+  const frameH = (photoAreaH - FRAME_GAP * (frameCount - 1)) / frameCount
 
-  for (let s = 0; s < 2; s++) {
-    const sx = OUTER + s * (STRIP_W + GUTTER)
-    const sy = OUTER
-    const photoAreaH = PH - OUTER * 2 - FOOTER_H
-    const frameW = STRIP_W - INNER_PAD * 2
-    const frameH = (photoAreaH - INNER_PAD * 2 - FRAME_GAP * (frameCount - 1)) / frameCount
-
-    const frames: Rect[] = []
-    for (let i = 0; i < frameCount; i++) {
-      frames.push({
-        x: sx + INNER_PAD,
-        y: sy + INNER_PAD + i * (frameH + FRAME_GAP),
-        w: frameW,
-        h: frameH,
-      })
-    }
-
-    sections.push({
-      bounds: { x: sx, y: sy, w: STRIP_W, h: PH - OUTER * 2 },
-      frames,
-      footer: { x: sx, y: PH - OUTER - FOOTER_H, w: STRIP_W, h: FOOTER_H },
+  const frames: Rect[] = []
+  for (let i = 0; i < frameCount; i++) {
+    frames.push({
+      x: OUTER,
+      y: OUTER + i * (frameH + FRAME_GAP),
+      w: frameW,
+      h: frameH,
     })
   }
 
-  const cutX = OUTER + STRIP_W + GUTTER / 2
+  const section: StripSection = {
+    bounds: { x: 0, y: 0, w: PW, h: PH },
+    frames,
+    footer: { x: OUTER, y: PH - OUTER - FOOTER_H, w: PW - OUTER * 2, h: FOOTER_H },
+  }
+
   return {
     paper: PAPER_PORTRAIT,
     orientation: 'portrait',
-    sections,
-    cutLine: { x: cutX, y1: OUTER / 2, y2: PH - OUTER / 2 },
+    sections: [section],
   }
 }
 

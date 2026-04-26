@@ -10,6 +10,14 @@ import { generateLivePhoto } from '@/lib/live-photo'
 import { uploadComposed, uploadLiveVideo } from '@/lib/supabase/photos'
 import { dbUpdateSession } from '@/lib/supabase/sessions'
 
+type UploadState =
+  | 'idle'
+  | 'composing'
+  | 'uploading'
+  | 'uploaded'
+  | 'local-only'
+  | 'error'
+
 export function PreviewScreen() {
   const photos = useSession((s) => s.photos)
   const template = useSession((s) => s.template)
@@ -23,8 +31,30 @@ export function PreviewScreen() {
   const placedStickers = useDecoration((s) => s.stickers)
 
   const [qrImg, setQrImg] = useState<string>('')
-  const [uploadState, setUploadState] = useState<'idle' | 'composing' | 'uploading' | 'ready' | 'local-only' | 'error'>('idle')
+  const [uploadState, setUploadState] = useState<UploadState>('idle')
 
+  // Generate the QR as soon as we have a sessionId — independent of upload
+  // status. The share page works the moment the row + photos hit Supabase,
+  // and re-fetches itself if the user reloads, so customers can scan early.
+  useEffect(() => {
+    if (!sessionId) return
+    const shareUrl = `${window.location.origin}/s/${sessionId}`
+    let cancelled = false
+    QRCode.toDataURL(shareUrl, {
+      width: 320,
+      margin: 1,
+      color: { dark: '#1a1412', light: '#f5e6c8' },
+    })
+      .then((q) => {
+        if (!cancelled) setQrImg(q)
+      })
+      .catch((e) => console.warn('QR encode failed', e))
+    return () => {
+      cancelled = true
+    }
+  }, [sessionId])
+
+  // Compose strip + upload + kick off live-photo encoding (background)
   useEffect(() => {
     if (composed || photos.length === 0) return
     let cancelled = false
@@ -44,44 +74,29 @@ export function PreviewScreen() {
 
         setUploadState('uploading')
         const publicUrl = sessionId ? await uploadComposed(sessionId, blob) : null
-
         if (cancelled) return
+
         setComposed({ blob, dataUrl, publicUrl })
 
-        if (publicUrl) {
-          if (sessionId) {
-            await dbUpdateSession(sessionId, {
-              final_image_url: publicUrl,
-              status: 'completed',
-              completed_at: new Date().toISOString(),
-            })
-
-            // Live photo runs in parallel — never gate the QR on this since
-            // it takes ~5s of recording time. Customer scans QR; if the live
-            // video lands a few seconds later, a refresh on their phone shows it.
-            void generateLivePhoto({ photos, borderId, theme })
-              .then(async ({ blob, ext }) => {
-                const liveUrl = await uploadLiveVideo(sessionId, blob, ext)
-                if (liveUrl) {
-                  await dbUpdateSession(sessionId, { live_video_url: liveUrl })
-                }
-              })
-              .catch((e) => console.warn('live photo gen failed', e))
-          }
-          // QR encodes the share page URL — gives customer access to BOTH the
-          // composed strip and individual raw frames, not just the strip.
-          const shareUrl = sessionId
-            ? `${window.location.origin}/s/${sessionId}`
-            : publicUrl
-          const qr = await QRCode.toDataURL(shareUrl, {
-            width: 320,
-            margin: 1,
-            color: { dark: '#1a1412', light: '#f5e6c8' },
+        if (publicUrl && sessionId) {
+          await dbUpdateSession(sessionId, {
+            final_image_url: publicUrl,
+            status: 'completed',
+            completed_at: new Date().toISOString(),
           })
-          if (!cancelled) {
-            setQrImg(qr)
-            setUploadState('ready')
-          }
+          setUploadState('uploaded')
+
+          // Live photo runs in parallel — never gate the QR on this since
+          // it takes ~5s of recording time. Customer can scan immediately;
+          // refresh on phone picks up the live clip when it lands.
+          void generateLivePhoto({ photos, borderId, theme })
+            .then(async ({ blob: vBlob, ext }) => {
+              const liveUrl = await uploadLiveVideo(sessionId, vBlob, ext)
+              if (liveUrl) {
+                await dbUpdateSession(sessionId, { live_video_url: liveUrl })
+              }
+            })
+            .catch((e) => console.warn('live photo gen failed', e))
         } else {
           setUploadState('local-only')
         }
@@ -129,7 +144,7 @@ export function PreviewScreen() {
             LOOKING GOOD ✦
           </div>
 
-          <QRPanel state={uploadState} qrImg={qrImg} />
+          <QRPanel state={uploadState} qrImg={qrImg} sessionId={sessionId} />
 
           <div className="flex gap-4 flex-wrap mt-2">
             <TVButton variant="secondary" size="md" onClick={download} disabled={!composed}>
@@ -148,17 +163,21 @@ export function PreviewScreen() {
 function QRPanel({
   state,
   qrImg,
+  sessionId,
 }: {
-  state: 'idle' | 'composing' | 'uploading' | 'ready' | 'local-only' | 'error'
+  state: UploadState
   qrImg: string
+  sessionId: string | null
 }) {
-  if (state === 'ready' && qrImg) {
+  // Show QR as soon as we have one — the share page handles partial state.
+  if (qrImg && sessionId) {
     return (
       <div className="flex items-center gap-4 bg-black/40 border-2 border-crt-cream/30 rounded-xl p-4">
         <img src={qrImg} alt="Download QR" className="w-28 h-28 bg-crt-cream rounded" />
         <div className="font-crt text-crt-cream">
           <div className="text-2xl text-crt-phosphor tracking-widest">SCAN UNTUK FOTO</div>
-          <div className="text-lg opacity-80 mt-1">STRIP + RAW FRAMES</div>
+          <div className="text-lg opacity-80 mt-1">RAW + STRIP + LIVE</div>
+          <UploadStatusInline state={state} />
         </div>
       </div>
     )
@@ -166,14 +185,28 @@ function QRPanel({
   if (state === 'composing') {
     return <div className="font-crt text-xl text-crt-amber animate-blink tracking-widest">● COMPOSING STRIP...</div>
   }
-  if (state === 'uploading') {
-    return <div className="font-crt text-xl text-crt-amber animate-blink tracking-widest">● UPLOADING...</div>
-  }
   if (state === 'local-only') {
     return <div className="font-crt text-lg text-crt-cream/70 tracking-widest">CLOUD OFFLINE — USE DOWNLOAD</div>
   }
   if (state === 'error') {
     return <div className="font-crt text-lg text-crt-red tracking-widest">● UPLOAD FAILED — USE DOWNLOAD</div>
+  }
+  return null
+}
+
+function UploadStatusInline({ state }: { state: UploadState }) {
+  if (state === 'uploaded') {
+    return (
+      <div className="text-sm text-crt-phosphor mt-1 tracking-widest">● READY</div>
+    )
+  }
+  if (state === 'uploading' || state === 'composing') {
+    return (
+      <div className="text-sm text-crt-amber mt-1 tracking-widest animate-blink">● UPLOADING...</div>
+    )
+  }
+  if (state === 'error') {
+    return <div className="text-sm text-crt-red mt-1 tracking-widest">● UPLOAD FAILED</div>
   }
   return null
 }
