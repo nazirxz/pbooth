@@ -17,7 +17,8 @@ export const appConfig = {
     },
   },
   capture: {
-    frameCount: 4,
+    // Number of shots per session is driven by the selected template's `frames`,
+    // not a global config — so picking TRIO captures 3, DUO captures 2, etc.
     countdownSec: 5,
     delayBetweenFramesMs: 800,
   },
@@ -37,9 +38,9 @@ export const appConfig = {
     composedBucket: 'composed',
   },
   templates: [
-    { id: 'strip-4', label: 'CLASSIC STRIP', frames: 4, layout: 'vertical' },
-    { id: 'strip-3', label: 'TRIO', frames: 3, layout: 'vertical' },
     { id: 'duo-2', label: 'DUO', frames: 2, layout: 'vertical' },
+    { id: 'strip-3', label: 'TRIO', frames: 3, layout: 'vertical' },
+    { id: 'strip-4', label: 'CLASSIC STRIP', frames: 4, layout: 'vertical' },
   ],
   filters: [
     { id: 'none', label: 'NORMAL' },

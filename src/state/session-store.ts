@@ -51,7 +51,7 @@ const initial = {
   sessionId: null,
   paymentRowId: null,
   payment: null,
-  template: 'strip-4' as TemplateId,
+  template: 'duo-2' as TemplateId,
   filter: 'none' as FilterId,
   photos: [] as CapturedPhoto[],
   composed: null as ComposedOutput | null,
