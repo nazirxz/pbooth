@@ -7,6 +7,7 @@ export interface SessionRow {
   filter_id: string | null
   payment_id: string | null
   final_image_url: string | null
+  live_video_url: string | null
   created_at: string
   completed_at: string | null
 }
@@ -32,7 +33,7 @@ export async function dbCreateSession(): Promise<SessionRow | null> {
 
 export async function dbUpdateSession(
   id: string,
-  patch: Partial<Pick<SessionRow, 'status' | 'template_id' | 'filter_id' | 'payment_id' | 'final_image_url' | 'completed_at'>>,
+  patch: Partial<Pick<SessionRow, 'status' | 'template_id' | 'filter_id' | 'payment_id' | 'final_image_url' | 'live_video_url' | 'completed_at'>>,
 ): Promise<void> {
   const sb = getSupabase()
   if (!sb) return

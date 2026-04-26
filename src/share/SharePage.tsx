@@ -91,8 +91,13 @@ function ErrorState({ error }: { error: string }) {
 function Body({ data }: { data: SharedSessionData }) {
   return (
     <div className="space-y-10">
-      {data.composedUrl && <ComposedSection url={data.composedUrl} sessionId={data.sessionId} />}
       {data.photos.length > 0 && <RawSection photos={data.photos} sessionId={data.sessionId} />}
+      {data.composedUrl && <ComposedSection url={data.composedUrl} sessionId={data.sessionId} />}
+      {data.liveVideoUrl ? (
+        <LiveSection url={data.liveVideoUrl} sessionId={data.sessionId} />
+      ) : (
+        <LivePending />
+      )}
       {data.createdAt && (
         <div className="font-crt text-sm text-crt-cream/40 text-center tracking-widest">
           {new Date(data.createdAt).toLocaleString('id-ID', {
@@ -111,7 +116,7 @@ function Body({ data }: { data: SharedSessionData }) {
 function ComposedSection({ url, sessionId }: { url: string; sessionId: string }) {
   return (
     <section>
-      <SectionTitle channel="01">PRINT STRIP</SectionTitle>
+      <SectionTitle channel="02">PHOTO + BORDER</SectionTitle>
       <div className="bg-crt-cream rounded-xl p-3 shadow-[0_0_30px_rgba(245,230,200,0.15)] mb-4">
         <img
           src={url}
@@ -127,10 +132,52 @@ function ComposedSection({ url, sessionId }: { url: string; sessionId: string })
   )
 }
 
+function LiveSection({ url, sessionId }: { url: string; sessionId: string }) {
+  const ext = url.match(/\.(\w+)(?:\?|$)/)?.[1] ?? 'webm'
+  return (
+    <section>
+      <SectionTitle channel="03">LIVE PHOTO</SectionTitle>
+      <div className="bg-black rounded-xl border-2 border-crt-cream/30 overflow-hidden mb-4">
+        <video
+          src={url}
+          controls
+          playsInline
+          autoPlay
+          loop
+          muted
+          className="block w-full h-auto"
+        />
+      </div>
+      <DownloadLink href={url} filename={`pbooth_${sessionId.slice(0, 8)}_live.${ext}`}>
+        ⬇ DOWNLOAD LIVE PHOTO
+      </DownloadLink>
+      <p className="font-crt text-sm text-crt-cream/50 mt-3 text-center leading-snug">
+        Format {ext.toUpperCase()} · putar di galeri / VLC / browser
+      </p>
+    </section>
+  )
+}
+
+function LivePending() {
+  return (
+    <section>
+      <SectionTitle channel="03">LIVE PHOTO</SectionTitle>
+      <div className="bg-black/40 border-2 border-dashed border-crt-cream/30 rounded-xl p-6 text-center">
+        <div className="font-crt text-lg text-crt-amber animate-blink tracking-widest mb-1">
+          ▌ ENCODING...
+        </div>
+        <div className="font-crt text-sm text-crt-cream/60">
+          Refresh halaman ini sebentar lagi
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function RawSection({ photos, sessionId }: { photos: SharedSessionData['photos']; sessionId: string }) {
   return (
     <section>
-      <SectionTitle channel="02">RAW PHOTOS</SectionTitle>
+      <SectionTitle channel="01">RAW PHOTOS</SectionTitle>
       <div className="grid grid-cols-2 gap-3">
         {photos.map((p) => (
           <div key={p.index} className="space-y-2">

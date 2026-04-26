@@ -40,6 +40,7 @@ create table if not exists public.sessions (
   filter_id text,
   payment_id uuid references public.payments(id) on delete set null,
   final_image_url text,
+  live_video_url text,
   created_at timestamptz not null default now(),
   completed_at timestamptz
 );

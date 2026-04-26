@@ -50,3 +50,26 @@ export async function uploadComposed(
   const { data } = sb.storage.from(appConfig.supabase.composedBucket).getPublicUrl(path)
   return data.publicUrl
 }
+
+/**
+ * Upload the generated live-photo clip to the public `composed` bucket.
+ * Lives next to the strip JPG: `<sessionId>/live.{webm|mp4}`.
+ */
+export async function uploadLiveVideo(
+  sessionId: string,
+  blob: Blob,
+  ext: string,
+): Promise<string | null> {
+  const sb = getSupabase()
+  if (!sb) return null
+  const path = `${sessionId}/live.${ext}`
+  const { error } = await sb.storage
+    .from(appConfig.supabase.composedBucket)
+    .upload(path, blob, { contentType: blob.type, upsert: true })
+  if (error) {
+    console.warn('[supabase] uploadLiveVideo failed:', error.message)
+    return null
+  }
+  const { data } = sb.storage.from(appConfig.supabase.composedBucket).getPublicUrl(path)
+  return data.publicUrl
+}

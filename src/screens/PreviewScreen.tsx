@@ -6,7 +6,8 @@ import { useSession } from '@/state/session-store'
 import { useTheme } from '@/state/theme-store'
 import { useDecoration } from '@/state/decoration-store'
 import { composeStrip } from '@/lib/compose'
-import { uploadComposed } from '@/lib/supabase/photos'
+import { generateLivePhoto } from '@/lib/live-photo'
+import { uploadComposed, uploadLiveVideo } from '@/lib/supabase/photos'
 import { dbUpdateSession } from '@/lib/supabase/sessions'
 
 export function PreviewScreen() {
@@ -54,6 +55,18 @@ export function PreviewScreen() {
               status: 'completed',
               completed_at: new Date().toISOString(),
             })
+
+            // Live photo runs in parallel — never gate the QR on this since
+            // it takes ~5s of recording time. Customer scans QR; if the live
+            // video lands a few seconds later, a refresh on their phone shows it.
+            void generateLivePhoto({ photos, borderId, theme })
+              .then(async ({ blob, ext }) => {
+                const liveUrl = await uploadLiveVideo(sessionId, blob, ext)
+                if (liveUrl) {
+                  await dbUpdateSession(sessionId, { live_video_url: liveUrl })
+                }
+              })
+              .catch((e) => console.warn('live photo gen failed', e))
           }
           // QR encodes the share page URL — gives customer access to BOTH the
           // composed strip and individual raw frames, not just the strip.

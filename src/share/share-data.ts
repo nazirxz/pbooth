@@ -9,6 +9,7 @@ export interface SharedPhoto {
 export interface SharedSessionData {
   sessionId: string
   composedUrl: string | null
+  liveVideoUrl: string | null
   photos: SharedPhoto[]
   createdAt: string | null
 }
@@ -26,7 +27,7 @@ export async function fetchSharedSession(sessionId: string): Promise<SharedSessi
 
   const { data: session, error: sessErr } = await sb
     .from('sessions')
-    .select('id, final_image_url, created_at')
+    .select('id, final_image_url, live_video_url, created_at')
     .eq('id', sessionId)
     .single()
   if (sessErr || !session) throw new Error('SESSION_NOT_FOUND')
@@ -50,6 +51,7 @@ export async function fetchSharedSession(sessionId: string): Promise<SharedSessi
   return {
     sessionId: session.id,
     composedUrl: session.final_image_url ?? null,
+    liveVideoUrl: session.live_video_url ?? null,
     photos: photoEntries,
     createdAt: session.created_at ?? null,
   }
