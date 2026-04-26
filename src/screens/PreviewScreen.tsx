@@ -55,7 +55,12 @@ export function PreviewScreen() {
               completed_at: new Date().toISOString(),
             })
           }
-          const qr = await QRCode.toDataURL(publicUrl, {
+          // QR encodes the share page URL — gives customer access to BOTH the
+          // composed strip and individual raw frames, not just the strip.
+          const shareUrl = sessionId
+            ? `${window.location.origin}/s/${sessionId}`
+            : publicUrl
+          const qr = await QRCode.toDataURL(shareUrl, {
             width: 320,
             margin: 1,
             color: { dark: '#1a1412', light: '#f5e6c8' },
@@ -139,8 +144,8 @@ function QRPanel({
       <div className="flex items-center gap-4 bg-black/40 border-2 border-crt-cream/30 rounded-xl p-4">
         <img src={qrImg} alt="Download QR" className="w-28 h-28 bg-crt-cream rounded" />
         <div className="font-crt text-crt-cream">
-          <div className="text-2xl text-crt-phosphor tracking-widest">SCAN TO DOWNLOAD</div>
-          <div className="text-lg opacity-80 mt-1">ON YOUR PHONE</div>
+          <div className="text-2xl text-crt-phosphor tracking-widest">SCAN UNTUK FOTO</div>
+          <div className="text-lg opacity-80 mt-1">STRIP + RAW FRAMES</div>
         </div>
       </div>
     )

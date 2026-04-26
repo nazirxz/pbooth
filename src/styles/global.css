@@ -48,6 +48,18 @@ html.kiosk, html.kiosk body {
   cursor: none;
 }
 
+/* Share page (mobile via QR) — re-enable scrolling and natural selection. */
+html.share-mode,
+html.share-mode body,
+html.share-mode #root {
+  overflow: auto;
+  height: auto;
+  min-height: 100%;
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: auto;
+}
+
 body::-webkit-scrollbar { display: none; }
 
 /* ─────────── RETRO EFFECTS (used by retro theme frame + screens) ─────────── */
