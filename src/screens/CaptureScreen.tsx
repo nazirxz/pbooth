@@ -7,6 +7,8 @@ import { appConfig } from '@/config/app-config'
 import { useSession } from '@/state/session-store'
 import { createCameraSource } from '@/lib/camera'
 import { uploadPhoto } from '@/lib/supabase/photos'
+import { startLiveRecorder, type LiveRecorder } from '@/lib/live-photo'
+import { appConfig as cfg } from '@/config/app-config'
 
 export function CaptureScreen() {
   const goTo = useSession((s) => s.goTo)
@@ -16,6 +18,7 @@ export function CaptureScreen() {
   const clearPhotos = useSession((s) => s.clearPhotos)
   const sessionId = useSession((s) => s.sessionId)
   const photos = useSession((s) => s.photos)
+  const setLiveVideo = useSession((s) => s.setLiveVideo)
 
   const tmpl = appConfig.templates.find((t) => t.id === template)!
   const frameCount = tmpl.frames
@@ -28,13 +31,25 @@ export function CaptureScreen() {
 
   useEffect(() => {
     clearPhotos()
+    setLiveVideo(null)
     const src = sourceRef.current
     let cancelled = false
+    let recorder: LiveRecorder | null = null
 
     const run = async () => {
       const stream = await src.start()
       if (videoRef.current) videoRef.current.srcObject = stream
       await wait(500)
+
+      // Wait for the <video> to actually have frames so the recorder doesn't
+      // drop the first second as black.
+      if (videoRef.current) {
+        recorder = startLiveRecorder({
+          videoEl: videoRef.current,
+          width: cfg.camera.webcam.width,
+          height: cfg.camera.webcam.height,
+        })
+      }
 
       for (let i = 0; i < frameCount; i++) {
         if (cancelled) return
@@ -57,8 +72,20 @@ export function CaptureScreen() {
         await wait(appConfig.capture.delayBetweenFramesMs)
       }
 
+      // Tail a beat so the last shutter is part of the live clip, then stop.
+      await wait(600)
+      if (recorder) {
+        try {
+          const result = await recorder.stop()
+          if (!cancelled) setLiveVideo(result)
+        } catch (e) {
+          console.warn('[capture] live recorder stop failed', e)
+        }
+        recorder = null
+      }
+
       if (!cancelled) {
-        await wait(400)
+        await wait(200)
         goTo('decorate')
       }
     }
@@ -66,9 +93,10 @@ export function CaptureScreen() {
     run().catch((e) => console.error('capture flow error', e))
     return () => {
       cancelled = true
+      recorder?.cancel()
       src.stop()
     }
-  }, [frameCount, addPhoto, clearPhotos, goTo, sessionId])
+  }, [frameCount, addPhoto, clearPhotos, goTo, sessionId, setLiveVideo])
 
   return (
     <div className="absolute inset-0 grid grid-rows-[auto_1fr]">

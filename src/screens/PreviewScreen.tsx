@@ -6,7 +6,6 @@ import { useSession } from '@/state/session-store'
 import { useTheme } from '@/state/theme-store'
 import { useDecoration } from '@/state/decoration-store'
 import { composeStrip } from '@/lib/compose'
-import { generateLivePhoto } from '@/lib/live-photo'
 import { uploadComposed, uploadLiveVideo } from '@/lib/supabase/photos'
 import { dbUpdateSession } from '@/lib/supabase/sessions'
 import { appConfig } from '@/config/app-config'
@@ -28,6 +27,7 @@ export function PreviewScreen() {
   const sessionId = useSession((s) => s.sessionId)
   const composed = useSession((s) => s.composed)
   const setComposed = useSession((s) => s.setComposed)
+  const liveVideo = useSession((s) => s.liveVideo)
   const reset = useSession((s) => s.reset)
   const theme = useTheme((s) => s.theme)
   const borderId = useDecoration((s) => s.borderId)
@@ -94,33 +94,37 @@ export function PreviewScreen() {
           })
           setUploadState('uploaded')
 
-          // Live photo runs in parallel — never gate the QR on this since
-          // it takes ~5s of recording time. Customer can scan immediately;
-          // share page polls for the live clip until it lands.
-          setLiveState('recording')
-          setLiveError(null)
-          void generateLivePhoto({ photos, borderId, theme })
-            .then(async ({ blob: vBlob, ext }) => {
-              setLiveState('uploading')
-              const liveUrl = await uploadLiveVideo(sessionId, vBlob, ext)
-              if (!liveUrl) {
+          // Live video was already recorded during capture; just upload it.
+          // Share page polls for it, so the customer can scan the QR
+          // immediately without waiting for the upload to finish.
+          if (liveVideo) {
+            setLiveState('uploading')
+            setLiveError(null)
+            void (async () => {
+              try {
+                const liveUrl = await uploadLiveVideo(sessionId, liveVideo.blob, liveVideo.ext)
+                if (!liveUrl) {
+                  setLiveState('error')
+                  setLiveError('upload failed (cek bucket "composed" + storage policy)')
+                  return
+                }
+                const res = await dbUpdateSession(sessionId, { live_video_url: liveUrl })
+                if (!res.ok) {
+                  setLiveState('error')
+                  setLiveError(res.error ?? 'db update failed')
+                  return
+                }
+                setLiveState('ready')
+              } catch (e) {
+                console.warn('live video upload failed', e)
                 setLiveState('error')
-                setLiveError('upload failed (cek bucket "composed" + storage policy)')
-                return
+                setLiveError((e as Error)?.message ?? String(e))
               }
-              const res = await dbUpdateSession(sessionId, { live_video_url: liveUrl })
-              if (!res.ok) {
-                setLiveState('error')
-                setLiveError(res.error ?? 'db update failed')
-                return
-              }
-              setLiveState('ready')
-            })
-            .catch((e) => {
-              console.warn('live photo gen failed', e)
-              setLiveState('error')
-              setLiveError(e?.message ?? String(e))
-            })
+            })()
+          } else {
+            setLiveState('error')
+            setLiveError('clip tidak terekam saat capture')
+          }
         } else {
           setUploadState('local-only')
         }
@@ -133,7 +137,7 @@ export function PreviewScreen() {
     return () => {
       cancelled = true
     }
-  }, [composed, photos, template, filter, sessionId, setComposed, theme, borderId, placedStickers])
+  }, [composed, photos, template, filter, sessionId, setComposed, theme, borderId, placedStickers, liveVideo])
 
   const download = () => {
     if (!composed) return
