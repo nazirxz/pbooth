@@ -37,6 +37,12 @@ export const appConfig = {
     photosBucket: 'photos',
     composedBucket: 'composed',
   },
+  share: {
+    // Public URL where the share page is deployed (e.g. https://pbooth.vercel.app).
+    // The kiosk runs in Electron — window.location.origin there is `file://` and
+    // unreachable from a customer's phone, so the QR must point at this domain.
+    baseUrl: (import.meta.env.VITE_SHARE_BASE_URL ?? '').replace(/\/$/, ''),
+  },
   templates: [
     { id: 'duo-2', label: 'DUO', frames: 2, layout: 'vertical' },
     { id: 'strip-3', label: 'TRIO', frames: 3, layout: 'vertical' },

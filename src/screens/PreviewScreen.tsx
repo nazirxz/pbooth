@@ -9,6 +9,7 @@ import { composeStrip } from '@/lib/compose'
 import { generateLivePhoto } from '@/lib/live-photo'
 import { uploadComposed, uploadLiveVideo } from '@/lib/supabase/photos'
 import { dbUpdateSession } from '@/lib/supabase/sessions'
+import { appConfig } from '@/config/app-config'
 
 type UploadState =
   | 'idle'
@@ -39,7 +40,8 @@ export function PreviewScreen() {
   // and re-fetches itself if the user reloads, so customers can scan early.
   useEffect(() => {
     if (!sessionId) return
-    const url = `${window.location.origin}/s/${sessionId}`
+    const base = appConfig.share.baseUrl || window.location.origin
+    const url = `${base}/s/${sessionId}`
     setShareUrl(url)
     let cancelled = false
     QRCode.toDataURL(url, {

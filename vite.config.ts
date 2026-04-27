@@ -8,7 +8,11 @@ import path from 'node:path'
 const isWeb = process.env.PBOOTH_TARGET === 'web'
 
 export default defineConfig({
-  base: './',
+  // Electron loads from file:// so it needs relative asset paths.
+  // Web build is served from a domain root and must use absolute paths,
+  // otherwise routes like /s/<id> resolve assets to /s/assets/... and
+  // hit the SPA rewrite — returning index.html for the JS bundle.
+  base: isWeb ? '/' : './',
   resolve: {
     alias: { '@': path.resolve(__dirname, 'src') },
   },
