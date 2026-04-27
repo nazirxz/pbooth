@@ -19,6 +19,8 @@ type UploadState =
   | 'local-only'
   | 'error'
 
+type LiveState = 'idle' | 'recording' | 'uploading' | 'ready' | 'error'
+
 export function PreviewScreen() {
   const photos = useSession((s) => s.photos)
   const template = useSession((s) => s.template)
@@ -34,6 +36,8 @@ export function PreviewScreen() {
   const [qrImg, setQrImg] = useState<string>('')
   const [shareUrl, setShareUrl] = useState<string>('')
   const [uploadState, setUploadState] = useState<UploadState>('idle')
+  const [liveState, setLiveState] = useState<LiveState>('idle')
+  const [liveError, setLiveError] = useState<string | null>(null)
 
   // Generate the QR as soon as we have a sessionId — independent of upload
   // status. The share page works the moment the row + photos hit Supabase,
@@ -92,15 +96,31 @@ export function PreviewScreen() {
 
           // Live photo runs in parallel — never gate the QR on this since
           // it takes ~5s of recording time. Customer can scan immediately;
-          // refresh on phone picks up the live clip when it lands.
+          // share page polls for the live clip until it lands.
+          setLiveState('recording')
+          setLiveError(null)
           void generateLivePhoto({ photos, borderId, theme })
             .then(async ({ blob: vBlob, ext }) => {
+              setLiveState('uploading')
               const liveUrl = await uploadLiveVideo(sessionId, vBlob, ext)
-              if (liveUrl) {
-                await dbUpdateSession(sessionId, { live_video_url: liveUrl })
+              if (!liveUrl) {
+                setLiveState('error')
+                setLiveError('upload failed (cek bucket "composed" + storage policy)')
+                return
               }
+              const res = await dbUpdateSession(sessionId, { live_video_url: liveUrl })
+              if (!res.ok) {
+                setLiveState('error')
+                setLiveError(res.error ?? 'db update failed')
+                return
+              }
+              setLiveState('ready')
             })
-            .catch((e) => console.warn('live photo gen failed', e))
+            .catch((e) => {
+              console.warn('live photo gen failed', e)
+              setLiveState('error')
+              setLiveError(e?.message ?? String(e))
+            })
         } else {
           setUploadState('local-only')
         }
@@ -149,6 +169,8 @@ export function PreviewScreen() {
           </div>
 
           <QRPanel state={uploadState} qrImg={qrImg} sessionId={sessionId} shareUrl={shareUrl} />
+
+          <LiveStatus state={liveState} error={liveError} />
 
           <div className="flex gap-4 flex-wrap mt-2">
             <TVButton variant="secondary" size="md" onClick={download} disabled={!composed}>
@@ -216,6 +238,29 @@ function QRPanel({
     return <div className="font-crt text-lg text-crt-red tracking-widest">● UPLOAD FAILED — USE DOWNLOAD</div>
   }
   return null
+}
+
+function LiveStatus({ state, error }: { state: LiveState; error: string | null }) {
+  if (state === 'idle') return null
+  const label =
+    state === 'recording' ? '● RECORDING LIVE PHOTO...'
+    : state === 'uploading' ? '● UPLOADING LIVE PHOTO...'
+    : state === 'ready' ? '● LIVE PHOTO READY'
+    : '● LIVE PHOTO FAILED'
+  const tone =
+    state === 'ready' ? 'text-crt-phosphor'
+    : state === 'error' ? 'text-crt-red'
+    : 'text-crt-amber animate-blink'
+  return (
+    <div className="font-crt text-base tracking-widest space-y-1">
+      <div className={tone}>{label}</div>
+      {state === 'error' && error && (
+        <div className="text-xs text-crt-red/80 normal-case break-words max-w-md">
+          {error}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function UploadStatusInline({ state }: { state: UploadState }) {

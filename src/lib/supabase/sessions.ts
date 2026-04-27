@@ -34,9 +34,13 @@ export async function dbCreateSession(): Promise<SessionRow | null> {
 export async function dbUpdateSession(
   id: string,
   patch: Partial<Pick<SessionRow, 'status' | 'template_id' | 'filter_id' | 'payment_id' | 'final_image_url' | 'live_video_url' | 'completed_at'>>,
-): Promise<void> {
+): Promise<{ ok: boolean; error?: string }> {
   const sb = getSupabase()
-  if (!sb) return
+  if (!sb) return { ok: false, error: 'supabase not configured' }
   const { error } = await sb.from('sessions').update(patch).eq('id', id)
-  if (error) console.warn('[supabase] updateSession failed:', error.message)
+  if (error) {
+    console.warn('[supabase] updateSession failed:', error.message, 'patch:', patch)
+    return { ok: false, error: error.message }
+  }
+  return { ok: true }
 }

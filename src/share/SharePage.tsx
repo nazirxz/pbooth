@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Logo } from '@/components/Logo'
 import { fetchSharedSession, type SharedSessionData } from './share-data'
 
@@ -10,15 +10,35 @@ export function SharePage({ sessionId }: Props) {
   const [data, setData] = useState<SharedSessionData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const pollCount = useRef(0)
 
   useEffect(() => {
     let mounted = true
-    fetchSharedSession(sessionId)
-      .then((d) => mounted && setData(d))
-      .catch((e: Error) => mounted && setError(e.message))
-      .finally(() => mounted && setLoading(false))
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    const tick = async () => {
+      try {
+        const d = await fetchSharedSession(sessionId)
+        if (!mounted) return
+        setData(d)
+        setError(null)
+        // Live video lands a few seconds after the strip — poll until it's there
+        // (or 60s of trying) so the customer doesn't need to manually refresh.
+        if (!d.liveVideoUrl && pollCount.current < 20) {
+          pollCount.current += 1
+          timer = setTimeout(tick, 3000)
+        }
+      } catch (e) {
+        if (mounted) setError((e as Error).message)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    tick()
     return () => {
       mounted = false
+      if (timer) clearTimeout(timer)
     }
   }, [sessionId])
 
