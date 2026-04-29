@@ -78,8 +78,12 @@ export async function buildGifFromPhotos(opts: BuildGifOpts): Promise<BuildGifRe
   // If a finite loop count is requested, override the NETSCAPE2.0 block.
   const final = loop === 0 ? buf : patchLoopCount(buf, loop)
 
+  // Copy into a fresh ArrayBuffer-backed Uint8Array so the Blob constructor
+  // accepts it under TS 5.7's stricter ArrayBufferLike vs ArrayBuffer split.
+  const out = new Uint8Array(final.byteLength)
+  out.set(final)
   return {
-    blob: new Blob([final], { type: 'image/gif' }),
+    blob: new Blob([out], { type: 'image/gif' }),
     ext: 'gif',
   }
 }
