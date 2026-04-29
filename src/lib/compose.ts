@@ -130,12 +130,13 @@ function drawSectionFooter(
     ctx.strokeRect(qrX, qrY, qrSize, qrSize)
   }
 
-  // "euorna-booth" caption on the right
+  // "euorna-booth" caption on the right — sized to roughly match the QR
+  // height so both ends of the footer feel visually balanced.
   ctx.fillStyle = theme.compose.footerTextColor
-  ctx.font = theme.compose.footerFontSecondary
+  ctx.font = `bold 64px "VT323", "Press Start 2P", monospace`
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
-  ctx.fillText('euorna-booth', footer.x + footer.w - 8, footer.y + footer.h / 2)
+  ctx.fillText('euorna-booth', footer.x + footer.w - 12, footer.y + footer.h / 2)
 
   ctx.restore()
 }

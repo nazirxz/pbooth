@@ -1,9 +1,9 @@
-import { GIFEncoder, quantize, applyPalette } from 'gifenc'
+import { GIFEncoder, quantize, applyPalette, prequantize } from 'gifenc'
 import type { CapturedPhoto } from '@/state/session-store'
 
 export interface BuildGifOpts {
   photos: CapturedPhoto[]
-  /** Output frame width in px. Height follows source aspect. Default 480. */
+  /** Output frame width in px. Height follows source aspect. Default 360. */
   width?: number
   /** Per-frame display time in ms. Default 600. */
   frameDelayMs?: number
@@ -13,6 +13,8 @@ export interface BuildGifOpts {
   filterCss?: string
   /** If true, mirror horizontally to match selfie preview. Default true. */
   mirror?: boolean
+  /** Max colors in the shared palette. Lower = faster + smaller. Default 128. */
+  paletteSize?: 64 | 96 | 128 | 192 | 256
 }
 
 export interface BuildGifResult {
@@ -25,15 +27,18 @@ export interface BuildGifResult {
  * MediaRecorder live clip — same purpose (a moving keepsake) but produced
  * deterministically from the strip's actual frames.
  *
- * Encoding happens on the main thread via gifenc. For 4–6 frames at 480px
- * this typically completes in <500ms on a modern laptop.
+ * Speed strategy: quantize ONCE across a mosaic of all frames so we get a
+ * single shared palette, then per-frame only does drawCover + applyPalette
+ * (cheap). This is roughly N× faster than quantizing per frame and also
+ * shrinks output, since gifenc writes a single global color table.
  */
 export async function buildGifFromPhotos(opts: BuildGifOpts): Promise<BuildGifResult> {
-  const width = opts.width ?? 480
+  const width = opts.width ?? 360
   const delay = opts.frameDelayMs ?? 600
   const loop = opts.loopCount ?? 0
   const filter = opts.filterCss ?? 'none'
   const mirror = opts.mirror ?? true
+  const paletteSize = opts.paletteSize ?? 128
 
   if (opts.photos.length === 0) {
     throw new Error('buildGifFromPhotos: no photos to encode')
@@ -52,8 +57,10 @@ export async function buildGifFromPhotos(opts: BuildGifOpts): Promise<BuildGifRe
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) throw new Error('buildGifFromPhotos: 2d context unavailable')
 
-  const enc = GIFEncoder()
-
+  // Render every frame once into pixel buffers. Held in memory only as long
+  // as encoding takes — N × width × height × 4 bytes. At defaults that's
+  // ~2 MB for 4 frames, fine.
+  const frameData: Uint8ClampedArray[] = []
   for (const img of imgs) {
     ctx.save()
     ctx.filter = filter
@@ -63,11 +70,25 @@ export async function buildGifFromPhotos(opts: BuildGifOpts): Promise<BuildGifRe
     }
     drawCover(ctx, img, 0, 0, width, height)
     ctx.restore()
+    frameData.push(ctx.getImageData(0, 0, width, height).data)
+  }
 
-    const { data } = ctx.getImageData(0, 0, width, height)
-    const palette = quantize(data, 256)
-    const indexed = applyPalette(data, palette)
-    enc.writeFrame(indexed, width, height, { palette, delay })
+  // Build a stitched mosaic of all frames, then quantize ONCE → shared palette.
+  // Sampling across all frames keeps colors representative, but we only do the
+  // expensive median-cut once instead of N times.
+  const mosaic = new Uint8ClampedArray(width * height * frameData.length * 4)
+  for (let i = 0; i < frameData.length; i++) {
+    mosaic.set(frameData[i], i * frameData[i].length)
+  }
+  prequantize(mosaic, { roundRGB: 5, oneBitAlpha: false })
+  const palette = quantize(mosaic, paletteSize, { format: 'rgb444' })
+
+  const enc = GIFEncoder()
+  for (let i = 0; i < frameData.length; i++) {
+    const indexed = applyPalette(frameData[i], palette, 'rgb444')
+    // Pass palette on the first frame only — gifenc treats it as the global
+    // color table; later frames inherit it (smaller file, faster write).
+    enc.writeFrame(indexed, width, height, i === 0 ? { palette, delay } : { delay })
   }
 
   enc.finish()

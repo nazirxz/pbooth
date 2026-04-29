@@ -113,7 +113,6 @@ export function PreviewScreen() {
               const filterCss = theme.filters.find((f) => f.id === filter)?.css ?? 'none'
               const gif = await buildGifFromPhotos({
                 photos,
-                width: 480,
                 frameDelayMs: 600,
                 filterCss,
               })
