@@ -42,33 +42,28 @@ export function DecorateScreen() {
   // Build the live-photo GIF in the background while the user picks a border /
   // places stickers. By the time they hit Done, the asset is already cached
   // and PreviewScreen can skip straight to upload — no encode wait visible.
-  // Yielding via requestIdleCallback (fallback setTimeout) keeps the UI smooth.
+  // Plain setTimeout (not requestIdleCallback) so it fires reliably even with
+  // CSS animations / sticker drags eating idle time.
   useEffect(() => {
     if (liveAsset || photos.length === 0) return
     let cancelled = false
 
-    const kick = () => {
+    const handle = window.setTimeout(() => {
       if (cancelled) return
-      buildGifFromPhotos({
-        photos,
-        filterCss: theme.filters.find((f) => f.id === filter)?.css ?? 'none',
-      })
+      console.log('[decorate] starting background gif encode')
+      const filterCss = theme.filters.find((f) => f.id === filter)?.css ?? 'none'
+      buildGifFromPhotos({ photos, filterCss })
         .then((gif) => {
-          if (!cancelled) setLiveAsset(gif)
+          if (cancelled) return
+          console.log('[decorate] gif ready, caching to session store')
+          setLiveAsset(gif)
         })
         .catch((e) => console.warn('[decorate] background gif build failed', e))
-    }
-
-    const ric = (window as unknown as {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
-    }).requestIdleCallback
-    const handle = ric ? ric(kick, { timeout: 1500 }) : window.setTimeout(kick, 250)
+    }, 400)
 
     return () => {
       cancelled = true
-      const cic = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback
-      if (ric && cic) cic(handle as number)
-      else clearTimeout(handle as number)
+      clearTimeout(handle)
     }
   }, [liveAsset, photos, filter, theme, setLiveAsset])
 
