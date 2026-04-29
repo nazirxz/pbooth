@@ -28,6 +28,7 @@ export function PreviewScreen() {
   const sessionId = useSession((s) => s.sessionId)
   const composed = useSession((s) => s.composed)
   const setComposed = useSession((s) => s.setComposed)
+  const liveAsset = useSession((s) => s.liveAsset)
   const setLiveAsset = useSession((s) => s.setLiveAsset)
   const reset = useSession((s) => s.reset)
   const startPreviewCountdown = useSession((s) => s.startPreviewCountdown)
@@ -104,20 +105,24 @@ export function PreviewScreen() {
           })
           setUploadState('uploaded')
 
-          // Build the GIF from captured stills, then upload. Share page polls
-          // until live_video_url is set, so the customer can already scan.
-          setLiveState('encoding')
+          // GIF is normally already encoded in the background by DecorateScreen
+          // — if so, skip straight to upload. Fallback to encoding here for
+          // the unlikely case where the user blew through decorate too fast.
           setLiveError(null)
           void (async () => {
             try {
-              const filterCss = theme.filters.find((f) => f.id === filter)?.css ?? 'none'
-              const gif = await buildGifFromPhotos({
-                photos,
-                frameDelayMs: 600,
-                filterCss,
-              })
-              if (cancelled) return
-              setLiveAsset(gif)
+              let gif = liveAsset
+              if (!gif) {
+                setLiveState('encoding')
+                const filterCss = theme.filters.find((f) => f.id === filter)?.css ?? 'none'
+                gif = await buildGifFromPhotos({
+                  photos,
+                  frameDelayMs: 600,
+                  filterCss,
+                })
+                if (cancelled) return
+                setLiveAsset(gif)
+              }
 
               setLiveState('uploading')
               const liveUrl = await uploadLiveAsset(sessionId, gif.blob, gif.ext)
@@ -151,7 +156,7 @@ export function PreviewScreen() {
     return () => {
       cancelled = true
     }
-  }, [composed, photos, template, filter, sessionId, setComposed, theme, borderId, placedStickers, setLiveAsset])
+  }, [composed, photos, template, filter, sessionId, setComposed, theme, borderId, placedStickers, liveAsset, setLiveAsset])
 
   const download = () => {
     if (!composed) return

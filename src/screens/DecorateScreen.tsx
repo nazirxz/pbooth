@@ -8,6 +8,7 @@ import { useTheme } from '@/state/theme-store'
 import { BORDERS, bordersForTheme, getBorder } from '@/lib/borders'
 import { STICKERS, getSticker } from '@/lib/stickers'
 import { computePaperLayout, type PaperLayout } from '@/lib/strip-layout'
+import { buildGifFromPhotos } from '@/lib/gif-encoder'
 
 type Tab = 'border' | 'sticker'
 
@@ -16,6 +17,8 @@ export function DecorateScreen() {
   const photos = useSession((s) => s.photos)
   const template = useSession((s) => s.template)
   const filter = useSession((s) => s.filter)
+  const liveAsset = useSession((s) => s.liveAsset)
+  const setLiveAsset = useSession((s) => s.setLiveAsset)
   const theme = useTheme((s) => s.theme)
 
   const borderId = useDecoration((s) => s.borderId)
@@ -35,6 +38,39 @@ export function DecorateScreen() {
   useEffect(() => {
     resetDecoration('classic-black')
   }, [resetDecoration])
+
+  // Build the live-photo GIF in the background while the user picks a border /
+  // places stickers. By the time they hit Done, the asset is already cached
+  // and PreviewScreen can skip straight to upload — no encode wait visible.
+  // Yielding via requestIdleCallback (fallback setTimeout) keeps the UI smooth.
+  useEffect(() => {
+    if (liveAsset || photos.length === 0) return
+    let cancelled = false
+
+    const kick = () => {
+      if (cancelled) return
+      buildGifFromPhotos({
+        photos,
+        filterCss: theme.filters.find((f) => f.id === filter)?.css ?? 'none',
+      })
+        .then((gif) => {
+          if (!cancelled) setLiveAsset(gif)
+        })
+        .catch((e) => console.warn('[decorate] background gif build failed', e))
+    }
+
+    const ric = (window as unknown as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
+    }).requestIdleCallback
+    const handle = ric ? ric(kick, { timeout: 1500 }) : window.setTimeout(kick, 250)
+
+    return () => {
+      cancelled = true
+      const cic = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback
+      if (ric && cic) cic(handle as number)
+      else clearTimeout(handle as number)
+    }
+  }, [liveAsset, photos, filter, theme, setLiveAsset])
 
   const layout = useMemo(() => computePaperLayout(template), [template])
   const availableBorders = useMemo(() => bordersForTheme(theme.id), [theme.id])
