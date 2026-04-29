@@ -25,9 +25,9 @@ export interface ComposedOutput {
   publicUrl: string | null // null when Supabase upload didn't happen (offline / no env)
 }
 
-export interface LiveVideo {
+export interface LiveAsset {
   blob: Blob
-  ext: 'webm' | 'mp4'
+  ext: 'gif'
 }
 
 interface SessionState {
@@ -43,7 +43,7 @@ interface SessionState {
   filter: FilterId
   photos: CapturedPhoto[]
   composed: ComposedOutput | null
-  liveVideo: LiveVideo | null
+  liveAsset: LiveAsset | null
 
   goTo: (screen: ScreenId) => void
   setSessionId: (id: string | null) => void
@@ -56,7 +56,7 @@ interface SessionState {
   addPhoto: (photo: CapturedPhoto) => void
   clearPhotos: () => void
   setComposed: (c: ComposedOutput | null) => void
-  setLiveVideo: (v: LiveVideo | null) => void
+  setLiveAsset: (v: LiveAsset | null) => void
   reset: () => void
 }
 
@@ -71,7 +71,7 @@ const initial = {
   filter: 'none' as FilterId,
   photos: [] as CapturedPhoto[],
   composed: null as ComposedOutput | null,
-  liveVideo: null as LiveVideo | null,
+  liveAsset: null as LiveAsset | null,
 }
 
 export const useSession = create<SessionState>((set) => ({
@@ -87,6 +87,6 @@ export const useSession = create<SessionState>((set) => ({
   addPhoto: (photo) => set((s) => ({ photos: [...s.photos, photo] })),
   clearPhotos: () => set({ photos: [] }),
   setComposed: (composed) => set({ composed }),
-  setLiveVideo: (liveVideo) => set({ liveVideo }),
+  setLiveAsset: (liveAsset) => set({ liveAsset }),
   reset: () => set({ ...initial, screen: 'home' }),
 }))

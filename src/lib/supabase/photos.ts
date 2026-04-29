@@ -52,10 +52,12 @@ export async function uploadComposed(
 }
 
 /**
- * Upload the generated live-photo clip to the public `composed` bucket.
- * Lives next to the strip JPG: `<sessionId>/live.{webm|mp4}`.
+ * Upload the generated live-photo asset (GIF built from the captured stills)
+ * to the public `composed` bucket. Lives next to the strip JPG at
+ * `<sessionId>/live.<ext>`. The DB column is still named `live_video_url`
+ * for migration continuity — it just holds an image/gif URL now.
  */
-export async function uploadLiveVideo(
+export async function uploadLiveAsset(
   sessionId: string,
   blob: Blob,
   ext: string,
@@ -67,7 +69,7 @@ export async function uploadLiveVideo(
     .from(appConfig.supabase.composedBucket)
     .upload(path, blob, { contentType: blob.type, upsert: true })
   if (error) {
-    console.warn('[supabase] uploadLiveVideo failed:', error.message)
+    console.warn('[supabase] uploadLiveAsset failed:', error.message)
     return null
   }
   const { data } = sb.storage.from(appConfig.supabase.composedBucket).getPublicUrl(path)

@@ -6,9 +6,10 @@ import { useSession } from '@/state/session-store'
 import { useTheme } from '@/state/theme-store'
 import { useDecoration } from '@/state/decoration-store'
 import { composeStrip } from '@/lib/compose'
-import { uploadComposed, uploadLiveVideo } from '@/lib/supabase/photos'
+import { uploadComposed, uploadLiveAsset } from '@/lib/supabase/photos'
 import { dbUpdateSession } from '@/lib/supabase/sessions'
 import { appConfig } from '@/config/app-config'
+import { buildGifFromPhotos } from '@/lib/gif-encoder'
 
 type UploadState =
   | 'idle'
@@ -18,7 +19,7 @@ type UploadState =
   | 'local-only'
   | 'error'
 
-type LiveState = 'idle' | 'recording' | 'uploading' | 'ready' | 'error'
+type LiveState = 'idle' | 'encoding' | 'uploading' | 'ready' | 'error'
 
 export function PreviewScreen() {
   const photos = useSession((s) => s.photos)
@@ -27,7 +28,7 @@ export function PreviewScreen() {
   const sessionId = useSession((s) => s.sessionId)
   const composed = useSession((s) => s.composed)
   const setComposed = useSession((s) => s.setComposed)
-  const liveVideo = useSession((s) => s.liveVideo)
+  const setLiveAsset = useSession((s) => s.setLiveAsset)
   const reset = useSession((s) => s.reset)
   const startPreviewCountdown = useSession((s) => s.startPreviewCountdown)
   const theme = useTheme((s) => s.theme)
@@ -71,7 +72,7 @@ export function PreviewScreen() {
     }
   }, [sessionId])
 
-  // Compose strip + upload + kick off live-photo encoding (background)
+  // Compose strip + upload + build the GIF live photo from the captured stills
   useEffect(() => {
     if (composed || photos.length === 0) return
     let cancelled = false
@@ -103,37 +104,42 @@ export function PreviewScreen() {
           })
           setUploadState('uploaded')
 
-          // Live video was already recorded during capture; just upload it.
-          // Share page polls for it, so the customer can scan the QR
-          // immediately without waiting for the upload to finish.
-          if (liveVideo) {
-            setLiveState('uploading')
-            setLiveError(null)
-            void (async () => {
-              try {
-                const liveUrl = await uploadLiveVideo(sessionId, liveVideo.blob, liveVideo.ext)
-                if (!liveUrl) {
-                  setLiveState('error')
-                  setLiveError('upload failed (cek bucket "composed" + storage policy)')
-                  return
-                }
-                const res = await dbUpdateSession(sessionId, { live_video_url: liveUrl })
-                if (!res.ok) {
-                  setLiveState('error')
-                  setLiveError(res.error ?? 'db update failed')
-                  return
-                }
-                setLiveState('ready')
-              } catch (e) {
-                console.warn('live video upload failed', e)
+          // Build the GIF from captured stills, then upload. Share page polls
+          // until live_video_url is set, so the customer can already scan.
+          setLiveState('encoding')
+          setLiveError(null)
+          void (async () => {
+            try {
+              const filterCss = theme.filters.find((f) => f.id === filter)?.css ?? 'none'
+              const gif = await buildGifFromPhotos({
+                photos,
+                width: 480,
+                frameDelayMs: 600,
+                filterCss,
+              })
+              if (cancelled) return
+              setLiveAsset(gif)
+
+              setLiveState('uploading')
+              const liveUrl = await uploadLiveAsset(sessionId, gif.blob, gif.ext)
+              if (!liveUrl) {
                 setLiveState('error')
-                setLiveError((e as Error)?.message ?? String(e))
+                setLiveError('upload failed (cek bucket "composed" + storage policy)')
+                return
               }
-            })()
-          } else {
-            setLiveState('error')
-            setLiveError('clip tidak terekam saat capture')
-          }
+              const res = await dbUpdateSession(sessionId, { live_video_url: liveUrl })
+              if (!res.ok) {
+                setLiveState('error')
+                setLiveError(res.error ?? 'db update failed')
+                return
+              }
+              setLiveState('ready')
+            } catch (e) {
+              console.warn('live gif build/upload failed', e)
+              setLiveState('error')
+              setLiveError((e as Error)?.message ?? String(e))
+            }
+          })()
         } else {
           setUploadState('local-only')
         }
@@ -146,7 +152,7 @@ export function PreviewScreen() {
     return () => {
       cancelled = true
     }
-  }, [composed, photos, template, filter, sessionId, setComposed, theme, borderId, placedStickers, liveVideo])
+  }, [composed, photos, template, filter, sessionId, setComposed, theme, borderId, placedStickers, setLiveAsset])
 
   const download = () => {
     if (!composed) return
@@ -259,10 +265,10 @@ function QRPanel({
 function LiveStatus({ state, error }: { state: LiveState; error: string | null }) {
   if (state === 'idle') return null
   const label =
-    state === 'recording' ? '● RECORDING LIVE PHOTO...'
-    : state === 'uploading' ? '● UPLOADING LIVE PHOTO...'
-    : state === 'ready' ? '● LIVE PHOTO READY'
-    : '● LIVE PHOTO FAILED'
+    state === 'encoding' ? '● BUILDING GIF...'
+    : state === 'uploading' ? '● UPLOADING GIF...'
+    : state === 'ready' ? '● LIVE GIF READY'
+    : '● LIVE GIF FAILED'
   const tone =
     state === 'ready' ? 'text-crt-phosphor'
     : state === 'error' ? 'text-crt-red'

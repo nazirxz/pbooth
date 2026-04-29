@@ -153,26 +153,36 @@ function ComposedSection({ url, sessionId }: { url: string; sessionId: string })
 }
 
 function LiveSection({ url, sessionId }: { url: string; sessionId: string }) {
-  const ext = url.match(/\.(\w+)(?:\?|$)/)?.[1] ?? 'webm'
+  const ext = url.match(/\.(\w+)(?:\?|$)/)?.[1]?.toLowerCase() ?? 'gif'
+  const isVideo = ext === 'webm' || ext === 'mp4'
   return (
     <section>
       <SectionTitle channel="03">LIVE PHOTO</SectionTitle>
       <div className="bg-black rounded-xl border-2 border-crt-cream/30 overflow-hidden mb-4">
-        <video
-          src={url}
-          controls
-          playsInline
-          autoPlay
-          loop
-          muted
-          className="block w-full h-auto"
-        />
+        {isVideo ? (
+          <video
+            src={url}
+            controls
+            playsInline
+            autoPlay
+            loop
+            muted
+            className="block w-full h-auto"
+          />
+        ) : (
+          <img
+            src={url}
+            alt="Live photo GIF"
+            className="block w-full h-auto"
+            loading="lazy"
+          />
+        )}
       </div>
       <DownloadLink href={url} filename={`pbooth_${sessionId.slice(0, 8)}_live.${ext}`}>
         ⬇ DOWNLOAD LIVE PHOTO
       </DownloadLink>
       <p className="font-crt text-sm text-crt-cream/50 mt-3 text-center leading-snug">
-        Format {ext.toUpperCase()} · putar di galeri / VLC / browser
+        Format {ext.toUpperCase()} · simpan ke galeri & share langsung
       </p>
     </section>
   )
