@@ -11,11 +11,11 @@ interface Props {
 }
 
 /**
- * Film-leader style countdown: big numeral + reticle + clockwise pie wipe +
- * chromatic aberration, with a short retro "beep" on every tick.
+ * Classic cinema film-leader countdown — cream paper background, two thin
+ * black rings, full crosshair, a clockwise pie sweep, a fat serif numeral
+ * and a tiny red registration dot. Vignetted corners sell the projector look.
  *
- * Designed to be mounted with `key={value}` so each tick is a fresh animation
- * and the wipe restarts cleanly.
+ * Mount with `key={value}` so every tick is a fresh animation.
  */
 export function RetroCountdown({ value, durationMs = 1000, silent }: Props) {
   useEffect(() => {
@@ -24,159 +24,142 @@ export function RetroCountdown({ value, durationMs = 1000, silent }: Props) {
     playBeep(isFinal ? 1200 : 800, isFinal ? 0.18 : 0.09)
   }, [value, silent])
 
-  const r = 85
-  const circumference = 2 * Math.PI * r
+  const cx = 100
+  const cy = 100
+  const rOuter = 92
+  const rInner = 84
   const durS = durationMs / 1000
 
   return (
     <motion.div
       key={value}
-      initial={{ scale: 1.7, opacity: 0, filter: 'blur(8px) brightness(3)' }}
-      animate={{ scale: 1, opacity: 1, filter: 'blur(0px) brightness(1)' }}
-      exit={{ scale: 0.55, opacity: 0, filter: 'blur(4px) brightness(2)' }}
-      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      initial={{ scale: 1.05, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.96, opacity: 0 }}
+      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
       className="relative pointer-events-none"
     >
       <svg
         viewBox="0 0 200 200"
         className="w-[28rem] h-[28rem] max-w-[90vw] max-h-[60vh]"
-        style={{ filter: 'drop-shadow(0 0 28px rgba(57,255,20,0.55))' }}
       >
-        {/* Outer decorative rings */}
-        <circle cx="100" cy="100" r="96" fill="none" stroke="rgba(57,255,20,0.25)" strokeWidth="1" />
-        <circle
-          cx="100"
-          cy="100"
-          r="91"
-          fill="none"
-          stroke="rgba(57,255,20,0.5)"
-          strokeWidth="1"
-          strokeDasharray="2 3"
-        />
+        <defs>
+          {/* Soft vignette — darker at the corners, like a projected frame. */}
+          <radialGradient id="leaderBg" cx="50%" cy="50%" r="68%">
+            <stop offset="0%" stopColor="#efe7d6" />
+            <stop offset="65%" stopColor="#d8cdb5" />
+            <stop offset="100%" stopColor="#3a3128" />
+          </radialGradient>
+          {/* Subtle grain on the paper using turbulence. */}
+          <filter id="leaderGrain" x="0" y="0" width="100%" height="100%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3" />
+            <feColorMatrix
+              values="0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0.18 0"
+            />
+            <feComposite in2="SourceGraphic" operator="in" />
+          </filter>
+          {/* Extra corner darkening — overlays the whole frame. */}
+          <radialGradient id="leaderEdge" cx="50%" cy="50%" r="75%">
+            <stop offset="60%" stopColor="rgba(0,0,0,0)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.55)" />
+          </radialGradient>
+        </defs>
 
-        {/* Clockwise pie wipe — full at start, empty at end */}
+        {/* Paper / vignette background */}
+        <rect x="0" y="0" width="200" height="200" fill="url(#leaderBg)" />
+        <rect x="0" y="0" width="200" height="200" fill="url(#leaderBg)" filter="url(#leaderGrain)" opacity="0.5" />
+
+        {/* Full-width crosshair through the whole frame */}
+        <g stroke="#1a1412" strokeWidth="1.4" opacity="0.92">
+          <line x1="0" y1={cy} x2="200" y2={cy} />
+          <line x1={cx} y1="0" x2={cx} y2="200" />
+        </g>
+
+        {/* Clockwise pie wipe — a fat green/black arc drawn on top of the inner
+            ring, animated to vanish over the tick. Reads as the projector's
+            sweep hand "consuming" the dial. */}
         <motion.circle
-          cx="100"
-          cy="100"
-          r={r}
+          cx={cx}
+          cy={cy}
+          r={rInner - 4}
           fill="none"
-          stroke="#39ff14"
-          strokeWidth="6"
-          strokeLinecap="butt"
-          transform="rotate(-90 100 100)"
-          strokeDasharray={circumference}
+          stroke="rgba(26,20,18,0.22)"
+          strokeWidth={(rInner - 4) * 2}
+          strokeDasharray={2 * Math.PI * (rInner - 4)}
+          transform={`rotate(-90 ${cx} ${cy})`}
           initial={{ strokeDashoffset: 0 }}
-          animate={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: 2 * Math.PI * (rInner - 4) }}
           transition={{ duration: durS, ease: 'linear' }}
         />
 
-        {/* Clock tick marks every 30 degrees */}
-        {Array.from({ length: 12 }).map((_, i) => {
-          const angle = ((i * 30 - 90) * Math.PI) / 180
-          const long = i % 3 === 0
-          const inner = long ? 78 : 82
-          const outer = long ? 89 : 87
-          return (
-            <line
-              key={i}
-              x1={100 + inner * Math.cos(angle)}
-              y1={100 + inner * Math.sin(angle)}
-              x2={100 + outer * Math.cos(angle)}
-              y2={100 + outer * Math.sin(angle)}
-              stroke="#39ff14"
-              strokeWidth={long ? 2 : 1}
-              opacity={long ? 0.85 : 0.45}
-            />
-          )
-        })}
+        {/* Thin clock-hand that rotates with the wipe */}
+        <SweepHand cx={cx} cy={cy} r={rInner - 2} durS={durS} />
 
-        {/* Crosshair marks at cardinal edges */}
-        <g stroke="#39ff14" strokeWidth="1.5" opacity="0.75">
-          <line x1="4" y1="100" x2="22" y2="100" />
-          <line x1="178" y1="100" x2="196" y2="100" />
-          <line x1="100" y1="4" x2="100" y2="22" />
-          <line x1="100" y1="178" x2="100" y2="196" />
-        </g>
+        {/* Two concentric thin black rings */}
+        <circle cx={cx} cy={cy} r={rOuter} fill="none" stroke="#1a1412" strokeWidth="2" />
+        <circle cx={cx} cy={cy} r={rInner} fill="none" stroke="#1a1412" strokeWidth="1.6" />
 
-        {/* Inner ring + center dot */}
-        <circle cx="100" cy="100" r="4" fill="#39ff14" opacity="0.9" />
-        <circle cx="100" cy="100" r="70" fill="none" stroke="rgba(57,255,20,0.25)" strokeWidth="1" />
-
-        {/* Big number — triple-rendered for chromatic aberration */}
+        {/* Big bold serif numeral */}
         <g
-          fontSize="108"
-          fontFamily='"Press Start 2P", monospace'
+          fontSize="120"
+          fontFamily='"Bodoni Moda", "Playfair Display", "DM Serif Display", Georgia, serif'
+          fontWeight={900}
           textAnchor="middle"
           dominantBaseline="central"
         >
-          <text x="103" y="100" fill="rgba(255,0,110,0.75)">
-            {value}
-          </text>
-          <text x="97" y="100" fill="rgba(0,240,255,0.75)">
-            {value}
-          </text>
-          <text x="100" y="100" fill="#39ff14" stroke="#0a3d04" strokeWidth="1.5" style={{ paintOrder: 'stroke fill' }}>
+          <text x={cx} y={cy + 4} fill="#1a1412">
             {value}
           </text>
         </g>
+
+        {/* Tiny red registration dot at 3 o'clock */}
+        <circle cx={cx + rInner + 6} cy={cy + 2} r="2.6" fill="#d63b2f" opacity="0.9" />
+
+        {/* Faint corner darkening (extra) */}
+        <rect x="0" y="0" width="200" height="200" fill="url(#leaderEdge)" pointerEvents="none" />
       </svg>
 
       {/* Sweeping scanline across the numeral */}
       <motion.div
         className="absolute inset-0 pointer-events-none overflow-hidden"
-        initial={{ opacity: 0.95 }}
-        animate={{ opacity: [0.95, 0.2, 0] }}
+        initial={{ opacity: 0.25 }}
+        animate={{ opacity: [0.25, 0.05, 0] }}
         transition={{ duration: 0.45, times: [0, 0.4, 1] }}
       >
         <div
-          className="absolute inset-x-0 h-3"
+          className="absolute inset-x-0 h-2"
           style={{
             top: '50%',
-            background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.85), transparent)',
+            background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.35), transparent)',
             transform: 'translateY(-50%)',
-            mixBlendMode: 'screen',
+            mixBlendMode: 'multiply',
           }}
         />
       </motion.div>
-
-      {/* Corner brackets — cine viewfinder style */}
-      <div className="absolute inset-0 pointer-events-none">
-        {(['tl', 'tr', 'bl', 'br'] as const).map((pos) => (
-          <Bracket key={pos} pos={pos} />
-        ))}
-      </div>
     </motion.div>
   )
 }
 
-function Bracket({ pos }: { pos: 'tl' | 'tr' | 'bl' | 'br' }) {
-  const style: React.CSSProperties = {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderColor: '#39ff14',
-    borderStyle: 'solid',
-    opacity: 0.75,
-    filter: 'drop-shadow(0 0 10px rgba(57,255,20,0.5))',
-  }
-  if (pos === 'tl') {
-    style.top = 8
-    style.left = 8
-    style.borderWidth = '3px 0 0 3px'
-  } else if (pos === 'tr') {
-    style.top = 8
-    style.right = 8
-    style.borderWidth = '3px 3px 0 0'
-  } else if (pos === 'bl') {
-    style.bottom = 8
-    style.left = 8
-    style.borderWidth = '0 0 3px 3px'
-  } else {
-    style.bottom = 8
-    style.right = 8
-    style.borderWidth = '0 3px 3px 0'
-  }
-  return <div style={style} />
+/** A thin sweeping "clock hand" that rotates clockwise across the disc. */
+function SweepHand({ cx, cy, r, durS }: { cx: number; cy: number; r: number; durS: number }) {
+  return (
+    <motion.line
+      x1={cx}
+      y1={cy}
+      x2={cx}
+      y2={cy - r}
+      stroke="#1a1412"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      style={{ transformOrigin: `${cx}px ${cy}px` }}
+      initial={{ rotate: 0 }}
+      animate={{ rotate: 360 }}
+      transition={{ duration: durS, ease: 'linear' }}
+    />
+  )
 }
 
 /* Simple synthesized beep using Web Audio API — works without any asset. */

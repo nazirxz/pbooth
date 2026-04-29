@@ -29,6 +29,7 @@ export function PreviewScreen() {
   const setComposed = useSession((s) => s.setComposed)
   const liveVideo = useSession((s) => s.liveVideo)
   const reset = useSession((s) => s.reset)
+  const startPreviewCountdown = useSession((s) => s.startPreviewCountdown)
   const theme = useTheme((s) => s.theme)
   const borderId = useDecoration((s) => s.borderId)
   const placedStickers = useDecoration((s) => s.stickers)
@@ -38,6 +39,14 @@ export function PreviewScreen() {
   const [uploadState, setUploadState] = useState<UploadState>('idle')
   const [liveState, setLiveState] = useState<LiveState>('idle')
   const [liveError, setLiveError] = useState<string | null>(null)
+
+  // 3-minute "waiting for print" window — kicks the session timer into preview
+  // mode and auto-returns to the welcome screen when it expires.
+  useEffect(() => {
+    startPreviewCountdown()
+    const t = setTimeout(() => reset(), 3 * 60 * 1000)
+    return () => clearTimeout(t)
+  }, [startPreviewCountdown, reset])
 
   // Generate the QR as soon as we have a sessionId — independent of upload
   // status. The share page works the moment the row + photos hit Supabase,
@@ -168,8 +177,11 @@ export function PreviewScreen() {
 
         <div className="flex flex-col gap-6 justify-center min-w-0">
           <div className="font-pixel text-5xl text-crt-phosphor rgb-split leading-tight">YOUR STRIP</div>
-          <div className="font-crt text-2xl text-crt-cream/80 tracking-widest">
-            LOOKING GOOD ✦
+          <div className="font-crt text-2xl text-crt-amber/90 tracking-widest animate-blink">
+            ● WAITING FOR YOUR PHOTO
+          </div>
+          <div className="font-crt text-base text-crt-cream/65 tracking-widest -mt-4">
+            (NUNGGU PRINT)
           </div>
 
           <QRPanel state={uploadState} qrImg={qrImg} sessionId={sessionId} shareUrl={shareUrl} />

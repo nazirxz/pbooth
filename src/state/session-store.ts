@@ -37,6 +37,8 @@ interface SessionState {
   payment: PaymentSession | null
   /** Timestamp (ms) when payment was confirmed paid. Drives the 5-min session timer. */
   paidAt: number | null
+  /** Timestamp (ms) when PreviewScreen mounted. Drives the 3-min print/wait countdown. */
+  previewStartedAt: number | null
   template: TemplateId
   filter: FilterId
   photos: CapturedPhoto[]
@@ -48,6 +50,7 @@ interface SessionState {
   setPaymentRowId: (id: string | null) => void
   setPayment: (p: PaymentSession | null) => void
   markPaid: () => void
+  startPreviewCountdown: () => void
   setTemplate: (t: TemplateId) => void
   setFilter: (f: FilterId) => void
   addPhoto: (photo: CapturedPhoto) => void
@@ -63,6 +66,7 @@ const initial = {
   paymentRowId: null,
   payment: null,
   paidAt: null as number | null,
+  previewStartedAt: null as number | null,
   template: 'duo-2' as TemplateId,
   filter: 'none' as FilterId,
   photos: [] as CapturedPhoto[],
@@ -77,6 +81,7 @@ export const useSession = create<SessionState>((set) => ({
   setPaymentRowId: (paymentRowId) => set({ paymentRowId }),
   setPayment: (payment) => set({ payment }),
   markPaid: () => set({ paidAt: Date.now() }),
+  startPreviewCountdown: () => set({ previewStartedAt: Date.now() }),
   setTemplate: (template) => set({ template }),
   setFilter: (filter) => set({ filter }),
   addPhoto: (photo) => set((s) => ({ photos: [...s.photos, photo] })),

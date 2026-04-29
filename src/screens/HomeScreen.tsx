@@ -43,7 +43,7 @@ export function HomeScreen() {
             TAP TO BEGIN
           </div>
           <TVButton onClick={start} size="xl" variant="primary">
-            ▶ PRESS START
+            ▶ START
           </TVButton>
         </motion.div>
       </div>

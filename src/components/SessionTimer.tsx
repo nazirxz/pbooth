@@ -2,28 +2,35 @@ import { useEffect, useState } from 'react'
 import clsx from 'clsx'
 import { useSession } from '@/state/session-store'
 
-const SESSION_DURATION_MS = 5 * 60 * 1000   // 5 minutes
+const SESSION_DURATION_MS = 5 * 60 * 1000   // 5 minutes — pre-preview flow
+const PREVIEW_DURATION_MS = 3 * 60 * 1000   // 3 minutes — print/wait window on PreviewScreen
 const WARNING_AT_MS = 60 * 1000              // amber when ≤ 1 min remaining
 const CRITICAL_AT_MS = 15 * 1000             // red when ≤ 15 sec remaining
 
 /**
- * Top-right HUD that counts down the customer's 5-minute paid session.
- * Mounts after `markPaid()` is called and stays visible until the session
- * is reset to home.
+ * Top-right HUD that counts down the customer's session.
+ *  - Pre-preview: 5 minutes from paidAt.
+ *  - On PreviewScreen: switches to a 3-minute print-wait window starting from
+ *    `previewStartedAt`. PreviewScreen itself handles auto-return to home
+ *    when this expires.
  */
 export function SessionTimer() {
   const paidAt = useSession((s) => s.paidAt)
+  const previewStartedAt = useSession((s) => s.previewStartedAt)
   const [now, setNow] = useState(() => Date.now())
 
+  const active = previewStartedAt ?? paidAt
+  const duration = previewStartedAt ? PREVIEW_DURATION_MS : SESSION_DURATION_MS
+
   useEffect(() => {
-    if (!paidAt) return
+    if (!active) return
     const t = setInterval(() => setNow(Date.now()), 500)
     return () => clearInterval(t)
-  }, [paidAt])
+  }, [active])
 
-  if (!paidAt) return null
+  if (!active) return null
 
-  const remaining = Math.max(0, SESSION_DURATION_MS - (now - paidAt))
+  const remaining = Math.max(0, duration - (now - active))
   const totalSec = Math.floor(remaining / 1000)
   const mm = String(Math.floor(totalSec / 60)).padStart(2, '0')
   const ss = String(totalSec % 60).padStart(2, '0')
@@ -55,7 +62,6 @@ export function SessionTimer() {
               : 'bg-crt-phosphor animate-blink',
           )}
         />
-        <span className="text-crt-cream/65 text-base tracking-widest">SESI</span>
         <span
           className={clsx(
             'text-2xl tabular-nums font-bold tracking-wider',

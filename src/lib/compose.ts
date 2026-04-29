@@ -5,7 +5,7 @@ import { getBorder } from '@/lib/borders'
 import { getSticker } from '@/lib/stickers'
 import { computePaperLayout, type PaperLayout, type Rect } from '@/lib/strip-layout'
 import type { Theme } from '@/themes'
-import logoBlackUrl from '@/asset/euorna_black.jpeg'
+import qrCodeUrl from '@/asset/qrcode_euorna_profile.jpeg'
 
 interface ComposeOpts {
   photos: CapturedPhoto[]
@@ -18,17 +18,17 @@ interface ComposeOpts {
   }
 }
 
-let cachedLogo: HTMLImageElement | null = null
-async function getLogo(): Promise<HTMLImageElement> {
-  if (cachedLogo) return cachedLogo
+let cachedQr: HTMLImageElement | null = null
+async function getQr(): Promise<HTMLImageElement> {
+  if (cachedQr) return cachedQr
   const img = new Image()
   img.crossOrigin = 'anonymous'
   await new Promise<void>((resolve, reject) => {
     img.onload = () => resolve()
     img.onerror = reject
-    img.src = logoBlackUrl
+    img.src = qrCodeUrl
   })
-  cachedLogo = img
+  cachedQr = img
   return img
 }
 
@@ -52,12 +52,12 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
     drawNoise(ctx, canvas.width, canvas.height, opts.theme.compose.noiseAmount)
   }
 
-  const logo = await getLogo().catch(() => null)
+  const qr = await getQr().catch(() => null)
 
   // Draw each strip section
   for (const section of layout.sections) {
     drawSectionFrames(ctx, section, imgs, opts)
-    drawSectionFooter(ctx, section.footer, logo, opts.theme)
+    drawSectionFooter(ctx, section.footer, qr, opts.theme)
   }
 
   // Cut line for 2-up strips
@@ -113,45 +113,30 @@ function drawSectionFrames(
 function drawSectionFooter(
   ctx: CanvasRenderingContext2D,
   footer: Rect,
-  logo: HTMLImageElement | null,
+  qr: HTMLImageElement | null,
   theme: Theme,
 ) {
   ctx.save()
-  // thin divider line at top of footer
-  ctx.fillStyle = theme.compose.borderColor
-  ctx.fillRect(footer.x + 10, footer.y, footer.w - 20, 2)
 
-  // logo
-  if (logo) {
-    const cropCenterY = 0.63
-    const cropHeightPct = 0.22
-    const srcY = logo.height * (cropCenterY - cropHeightPct / 2)
-    const srcH = logo.height * cropHeightPct
-    const destH = Math.min(50, footer.h * 0.42)
-    const destW = destH * (logo.width / srcH)
-    const destX = footer.x + 20
-    const destY = footer.y + (footer.h - destH) / 2 - 4
-    ctx.save()
-    ctx.globalCompositeOperation = 'multiply'
-    ctx.drawImage(logo, 0, srcY, logo.width, srcH, destX, destY, destW, destH)
-    ctx.restore()
+  // QR code on the bottom-left
+  const qrSize = Math.min(footer.h - 16, 110)
+  const qrX = footer.x + 8
+  const qrY = footer.y + (footer.h - qrSize) / 2
+  if (qr) {
+    ctx.drawImage(qr, qrX, qrY, qrSize, qrSize)
   } else {
-    ctx.fillStyle = theme.compose.footerTextColor
-    ctx.font = theme.compose.footerFontPrimary
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'middle'
-    ctx.fillText('EUORNA', footer.x + 20, footer.y + footer.h / 2)
+    ctx.strokeStyle = theme.compose.footerTextColor
+    ctx.lineWidth = 2
+    ctx.strokeRect(qrX, qrY, qrSize, qrSize)
   }
 
-  // date on the right
+  // "euorna-booth" caption on the right
   ctx.fillStyle = theme.compose.footerTextColor
   ctx.font = theme.compose.footerFontSecondary
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
-  const dateStr = new Date()
-    .toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: '2-digit' })
-    .toUpperCase()
-  ctx.fillText(dateStr, footer.x + footer.w - 20, footer.y + footer.h / 2 + 4)
+  ctx.fillText('euorna-booth', footer.x + footer.w - 8, footer.y + footer.h / 2)
+
   ctx.restore()
 }
 

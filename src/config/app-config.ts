@@ -19,7 +19,7 @@ export const appConfig = {
   capture: {
     // Number of shots per session is driven by the selected template's `frames`,
     // not a global config — so picking TRIO captures 3, DUO captures 2, etc.
-    countdownSec: 5,
+    countdownSec: 3,
     delayBetweenFramesMs: 800,
   },
   payment: {

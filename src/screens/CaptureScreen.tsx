@@ -84,6 +84,10 @@ export function CaptureScreen() {
         recorder = null
       }
 
+      // Camera off the moment shooting is done — no need to keep it warm
+      // through the decorate/preview flow.
+      src.stop()
+
       if (!cancelled) {
         await wait(200)
         goTo('decorate')
