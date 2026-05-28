@@ -7,8 +7,7 @@ export function getPaymentProvider(): PaymentProvider {
   switch (appConfig.payment.provider) {
     case 'mock':
       return mockPaymentProvider
-    case 'qris':
-    case 'midtrans':
+    case 'doku':
       return qrisPaymentProvider
     default:
       return mockPaymentProvider
@@ -17,3 +16,4 @@ export function getPaymentProvider(): PaymentProvider {
 
 export * from './types'
 export { simulatePaid } from './mock-provider'
+export { simulateDokuPaid } from './qris-provider'

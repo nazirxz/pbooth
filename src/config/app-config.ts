@@ -24,12 +24,19 @@ export const appConfig = {
   },
   payment: {
     enabled: true,
-    provider: 'mock' as 'mock' | 'qris' | 'midtrans',
+    provider: (import.meta.env.VITE_PAYMENT_PROVIDER ?? 'mock') as
+      | 'mock'
+      | 'doku',
     amount: 30_000,
     currency: 'IDR',
     timeoutSec: 300,
     devSkipButton: true,
     mockAutoResolveMs: 3_000,
+    doku: {
+      // Optional override for the create-doku-payment edge function URL.
+      // When unset, the provider derives it from VITE_SUPABASE_URL.
+      createUrl: (import.meta.env.VITE_DOKU_CREATE_URL ?? '').replace(/\/$/, ''),
+    },
   },
   supabase: {
     url: import.meta.env.VITE_SUPABASE_URL ?? '',

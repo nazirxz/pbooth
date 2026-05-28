@@ -1,0 +1,19 @@
+# Supabase config for the Pbooth project.
+# Generated for the DOKU integration; expand as needed when other
+# Supabase features are introduced.
+
+project_id = "ptrdmrlyckswfmrviqkl"
+
+# ─── Edge Functions ─────────────────────────────────────────────────────────
+# Both functions run on Deno. The webhook MUST disable JWT verification
+# because DOKU calls it directly without an auth header — security comes
+# from the HMAC-SHA256 signature instead.
+
+[functions.create-doku-payment]
+verify_jwt = true
+
+[functions.doku-webhook]
+verify_jwt = false
+
+[functions.dev-simulate-paid]
+verify_jwt = true

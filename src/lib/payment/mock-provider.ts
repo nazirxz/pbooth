@@ -13,7 +13,7 @@ const statuses = new Map<string, PaymentStatus>()
 export const mockPaymentProvider: PaymentProvider = {
   name: 'mock',
 
-  async createSession(amount) {
+  async createSession(amount, _opts) {
     const id = uid()
     const session: PaymentSession = {
       id,
