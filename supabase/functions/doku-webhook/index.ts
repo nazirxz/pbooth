@@ -22,6 +22,7 @@ import {
   buildDokuSignature,
   corsHeaders,
   jsonResponse,
+  loadDokuRuntime,
 } from "../_shared/doku.ts";
 
 type PaymentStatus =
@@ -82,21 +83,18 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const DOKU_CLIENT_ID = Deno.env.get("DOKU_CLIENT_ID");
-  const DOKU_SECRET_KEY = Deno.env.get("DOKU_SECRET_KEY");
+  const runtime = loadDokuRuntime();
   // The path DOKU signed against. Defaults to the public function URL path.
   const WEBHOOK_REQUEST_TARGET = Deno.env.get("DOKU_WEBHOOK_REQUEST_TARGET") ??
     "/functions/v1/doku-webhook";
 
-  if (
-    !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !DOKU_CLIENT_ID ||
-    !DOKU_SECRET_KEY
-  ) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !runtime) {
     return jsonResponse(
       { error: "missing_env" },
       { status: 500, req },
     );
   }
+  const { clientId: DOKU_CLIENT_ID, secretKey: DOKU_SECRET_KEY } = runtime;
 
   const clientId = req.headers.get("Client-Id") ?? "";
   const requestId = req.headers.get("Request-Id") ?? "";

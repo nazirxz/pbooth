@@ -105,6 +105,67 @@ export function uuidV4(): string {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Env resolution — pick credentials based on DOKU_ENV.
+//
+// Lookup order:
+//   1. DOKU_<ENV>_<NAME>     prefixed (preferred — lets sandbox + prod
+//                            credentials live side-by-side)
+//   2. DOKU_<NAME>           generic (back-compat with the original
+//                            single-set deployment)
+//
+// `DOKU_ENV` defaults to `sandbox`. Setting it to `production` flips
+// every read at once.
+// ────────────────────────────────────────────────────────────────────────────
+
+export type DokuEnv = "sandbox" | "production";
+
+export function resolveDokuEnv(): DokuEnv {
+  const v = (Deno.env.get("DOKU_ENV") ?? "sandbox").toLowerCase();
+  return v === "production" ? "production" : "sandbox";
+}
+
+export function defaultBaseUrlFor(env: DokuEnv): string {
+  return env === "production"
+    ? "https://api.doku.com"
+    : "https://api-sandbox.doku.com";
+}
+
+/**
+ * Read a DOKU secret with `DOKU_<ENV>_<NAME>` taking precedence over the
+ * generic `DOKU_<NAME>`. Trims whitespace so secrets pasted with stray
+ * newlines don't silently break signature checks.
+ */
+export function dokuSecret(env: DokuEnv, name: string): string | null {
+  const upper = env.toUpperCase();
+  const prefixed = Deno.env.get(`DOKU_${upper}_${name}`);
+  if (prefixed && prefixed.trim().length > 0) return prefixed.trim();
+  const generic = Deno.env.get(`DOKU_${name}`);
+  if (generic && generic.trim().length > 0) return generic.trim();
+  return null;
+}
+
+export interface DokuRuntime {
+  env: DokuEnv;
+  baseUrl: string;
+  clientId: string;
+  secretKey: string;
+}
+
+/**
+ * Resolve the active DOKU runtime config from env. Throws (via the
+ * `null` field) when required credentials are missing — caller decides
+ * how to surface the error.
+ */
+export function loadDokuRuntime(): DokuRuntime | null {
+  const env = resolveDokuEnv();
+  const clientId = dokuSecret(env, "CLIENT_ID");
+  const secretKey = dokuSecret(env, "SECRET_KEY");
+  if (!clientId || !secretKey) return null;
+  const baseUrl = Deno.env.get("DOKU_BASE_URL") ?? defaultBaseUrlFor(env);
+  return { env, baseUrl, clientId, secretKey };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // CORS — kiosk runs from `file://` (Electron) and from a vite dev server.
 // Echo the Origin to keep both happy without listing each one explicitly.
 // ────────────────────────────────────────────────────────────────────────────

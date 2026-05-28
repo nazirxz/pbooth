@@ -202,30 +202,43 @@ manually flip URLs.
 
 ### Server side (Supabase Edge Function secrets)
 
-Switch to **sandbox** (testing):
+Credentials live side-by-side using a `DOKU_<ENV>_<NAME>` prefix scheme.
+The active set is picked by `DOKU_ENV`. Lookup order inside the edge
+function:
+
+1. `DOKU_<ENV>_CLIENT_ID` / `DOKU_<ENV>_SECRET_KEY` (preferred)
+2. `DOKU_CLIENT_ID` / `DOKU_SECRET_KEY` (legacy fallback)
+
+This lets you store both sandbox and production creds simultaneously and
+flip with a single secret update — no re-pasting credentials.
+
+**One-time setup (already done for this project)** — store both sets:
 
 ```bash
 SUPABASE_ACCESS_TOKEN=<pat> supabase secrets set \
-  DOKU_ENV=sandbox \
-  DOKU_CLIENT_ID=<sandbox client id> \
-  DOKU_SECRET_KEY=<sandbox secret>
+  DOKU_SANDBOX_CLIENT_ID=<sandbox client id> \
+  DOKU_SANDBOX_SECRET_KEY=<sandbox secret> \
+  DOKU_PROD_CLIENT_ID=<prod client id> \
+  DOKU_PROD_SECRET_KEY=<prod secret>
 ```
 
-Switch to **production**:
+**Switch active environment** — single command, no redeploy needed:
 
 ```bash
-SUPABASE_ACCESS_TOKEN=<pat> supabase secrets set \
-  DOKU_ENV=production \
-  DOKU_CLIENT_ID=<prod client id> \
-  DOKU_SECRET_KEY=<prod secret>
+# Use sandbox
+SUPABASE_ACCESS_TOKEN=<pat> supabase secrets set DOKU_ENV=sandbox
+
+# Use production
+SUPABASE_ACCESS_TOKEN=<pat> supabase secrets set DOKU_ENV=production
 ```
 
-No redeploy needed — Edge Functions read secrets fresh on every cold
-start. To force-refresh hot instances, hit the function once with a
-trivial request.
+Edge Functions read secrets fresh on every cold start; hot instances
+pick up the new value within a few seconds. To force-refresh, hit the
+function once with a trivial request.
 
-`DOKU_BASE_URL` can still be set explicitly to override the auto-derived
-host (e.g., for testing against a staging tier).
+`DOKU_BASE_URL` is auto-derived (`api-sandbox.doku.com` or
+`api.doku.com`) but can be overridden with an explicit value if you
+need to point at a staging tier.
 
 Each created payment row stores `provider_payload.doku_env` and
 `provider_payload.doku_base_url` so you can audit which environment a
@@ -265,20 +278,37 @@ VITE_SUPABASE_URL=https://your-prod-project.supabase.co
 VITE_SUPABASE_ANON_KEY=<prod anon>
 ```
 
+## Branch convention
+
+This project uses two long-lived branches:
+
+| Branch | Active `DOKU_ENV` | Used for |
+|---|---|---|
+| `development` | `sandbox` | Active development, sandbox tests, dev simulator runs |
+| `main` | `production` | Production deploys |
+
+The branches share the same source code — the difference is which
+Supabase secrets are active and which Vite mode the build runs under.
+Everyday work happens on `development`. When a release is ready, merge
+`development` → `main` and follow the production hardening checklist
+below before re-deploying.
+
 ## Production hardening checklist
 
 When you are ready to flip the kiosk to a real DOKU production account,
 do these in order — getting any one of them wrong has been a common
 source of incidents at other merchants:
 
-1. **Regenerate the sandbox Secret Key** in the DOKU back office (it's
-   been pasted into chat history and should be considered compromised).
+1. **Regenerate the sandbox AND production Secret Keys** in the DOKU
+   back office (both have been pasted into chat history and should be
+   considered compromised). Update the matching `DOKU_SANDBOX_SECRET_KEY`
+   and `DOKU_PROD_SECRET_KEY` Supabase secrets after rotation.
 2. **Tighten RLS on `payments`**: drop the anon UPDATE policy added in
    `001_init.sql`. The doku-webhook uses the service role and doesn't
    need anon writes; the renderer never writes status anymore.
-3. **Set production secrets** on Supabase using the command in the
-   "Server side" section above (`DOKU_ENV=production` + matching
-   credentials).
+3. **Flip the active env** to production:
+   `supabase secrets set DOKU_ENV=production` (credentials are already
+   stored under the `DOKU_PROD_*` prefix so no re-paste is needed).
 4. **Register the webhook URL on DOKU production** (it's a separate
    registration from sandbox):
    `https://<project-ref>.supabase.co/functions/v1/doku-webhook`
@@ -288,3 +318,6 @@ source of incidents at other merchants:
    `dist-web/` (or electron) artifact. Verify the bundle's runtime env
    by opening DevTools and running
    `import.meta.env.VITE_PAYMENT_PROVIDER` (should print `doku`).
+7. **Disable the dev simulate button** by setting
+   `payment.devSkipButton = false` in `src/config/app-config.ts` (or
+   binding it to a `VITE_*` env var).

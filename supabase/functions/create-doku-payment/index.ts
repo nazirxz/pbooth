@@ -20,6 +20,7 @@ import {
   corsHeaders,
   dokuTimestamp,
   jsonResponse,
+  loadDokuRuntime,
   uuidV4,
 } from "../_shared/doku.ts";
 
@@ -50,33 +51,27 @@ Deno.serve(async (req) => {
   // ── env ─────────────────────────────────────────────────────────────────
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-  // DOKU env can be 'sandbox' or 'production'. The base URL is auto-derived
-  // unless explicitly overridden via DOKU_BASE_URL. This makes switching
-  // environments a one-secret change: update DOKU_ENV (+ matching credentials)
-  // and the function picks the right host.
-  const DOKU_ENV = (Deno.env.get("DOKU_ENV") ?? "sandbox").toLowerCase();
-  const DOKU_BASE_URL = Deno.env.get("DOKU_BASE_URL") ??
-    (DOKU_ENV === "production"
-      ? "https://api.doku.com"
-      : "https://api-sandbox.doku.com");
-  const DOKU_CLIENT_ID = Deno.env.get("DOKU_CLIENT_ID");
-  const DOKU_SECRET_KEY = Deno.env.get("DOKU_SECRET_KEY");
+  const runtime = loadDokuRuntime();
   const DEFAULT_DUE_MIN = parseInt(
     Deno.env.get("DOKU_DEFAULT_PAYMENT_DUE_MIN") ?? "60",
     10,
   );
   const CALLBACK_URL = Deno.env.get("DOKU_CALLBACK_URL") ?? "";
 
-  if (
-    !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !DOKU_CLIENT_ID ||
-    !DOKU_SECRET_KEY
-  ) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !runtime) {
     return jsonResponse(
-      { error: "missing_env", detail: "DOKU_* or SUPABASE_* env not set" },
+      {
+        error: "missing_env",
+        detail:
+          "DOKU credentials not set for the active DOKU_ENV. " +
+          "Use `supabase secrets set DOKU_<ENV>_CLIENT_ID=... DOKU_<ENV>_SECRET_KEY=...`.",
+      },
       { status: 500, req },
     );
   }
+
+  const { env: DOKU_ENV, baseUrl: DOKU_BASE_URL, clientId: DOKU_CLIENT_ID,
+    secretKey: DOKU_SECRET_KEY } = runtime;
 
   // ── input ───────────────────────────────────────────────────────────────
   let input: CreatePaymentRequest;
