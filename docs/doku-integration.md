@@ -37,6 +37,7 @@ DOKU API calls; the kiosk only renders QR + subscribes to Realtime.
 | `supabase/functions/_shared/doku.ts` | HMAC signing, CORS, JSON helpers |
 | `supabase/functions/create-doku-payment/` | kiosk → DOKU Checkout |
 | `supabase/functions/doku-webhook/` | DOKU → Pbooth (status update) |
+| `supabase/functions/dev-simulate-paid/` | sandbox-only shortcut for the kiosk's "DEV: SIMULATE PAID" button. Hard-locked when `DOKU_ENV=production`. |
 | `src/lib/payment/qris-provider.ts` | renderer side; calls edge function + Realtime |
 
 ## Deployment
@@ -89,6 +90,7 @@ supabase secrets set \
 ```bash
 supabase functions deploy create-doku-payment
 supabase functions deploy doku-webhook --no-verify-jwt
+supabase functions deploy dev-simulate-paid
 ```
 
 The `--no-verify-jwt` flag must match `verify_jwt = false` in
@@ -118,6 +120,24 @@ VITE_PAYMENT_PROVIDER=doku
 Restart `npm run dev` (Vite picks up env changes only on restart).
 
 ## Testing checklist (sandbox)
+
+### How to "pay" in sandbox without real money
+
+DOKU sandbox doesn't actually charge a real account, but the QR you
+scan with a real banking app won't connect to a real bank either.
+You have three ways to mark a sandbox payment as paid:
+
+| Path | When to use | How |
+|---|---|---|
+| **DOKU Simulator** | Most realistic — exercises the full webhook → row-update path | Open https://sandbox.doku.com/gtw-config-v2/simulator → pick **QRIS** → paste invoice number from the kiosk (or copy from `payments.invoice_number`) → click **Pay**. DOKU sends a signed notification to `doku-webhook` and the row flips to `paid`. |
+| **DEV: SIMULATE PAID** button | Fastest dev loop. Exercises the kiosk Realtime path but bypasses DOKU + signature verification. | Click the button on the kiosk Payment screen. The kiosk POSTs to `dev-simulate-paid` which marks the row paid via service role. The row keeps `provider_payload.dev_simulated = true` for audit. **Hard-locked when `DOKU_ENV=production`.** |
+| **Real banking app** | If you want to verify the QRIS string itself parses correctly | Most banking apps will refuse to actually charge the sandbox merchant, so this only validates the QR is well-formed — not end-to-end payment. |
+
+To hide the dev button in production, set
+`payment.devSkipButton = false` in `src/config/app-config.ts` (or load
+the value from env if you want runtime control).
+
+### End-to-end scenarios
 
 1. **Create a payment**
    - From a fresh `npm run dev`, click through to the Payment screen.
