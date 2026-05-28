@@ -30,7 +30,12 @@ export const appConfig = {
     amount: 30_000,
     currency: 'IDR',
     timeoutSec: 300,
-    devSkipButton: true,
+    // Show "DEV: SIMULATE PAID" only in Vite dev mode (`npm run dev`).
+    // Production builds (`npm run build`) baked import.meta.env.DEV=false,
+    // so this resolves to false and the button never renders. Belt-and-
+    // suspenders: the dev-simulate-paid edge function is also locked when
+    // DOKU_ENV=production server-side.
+    devSkipButton: import.meta.env.DEV,
     mockAutoResolveMs: 3_000,
     doku: {
       // Optional override for the create-doku-payment edge function URL.

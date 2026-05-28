@@ -4,12 +4,21 @@ dist-web
 dist-electron
 release
 
-# Env files
+# Vite env files — convention:
+#   .env                       gitignored (personal / local primary)
+#   .env.development           committed  (sandbox config — no real secrets)
+#   .env.production            committed  (production template — no real secrets)
+#   .env*.local                gitignored (real secrets / personal overrides)
 .env
 .env.local
 .env.*.local
-.env.development
-.env.production
+
+# Supabase CLI state — per-developer, never share
+supabase/.temp/
+
+# RSA / TLS keys — must NEVER be committed
+*.pem
+*.key
 
 .DS_Store
 *.log
