@@ -24,9 +24,15 @@ export const appConfig = {
   },
   payment: {
     enabled: true,
-    provider: (import.meta.env.VITE_PAYMENT_PROVIDER ?? 'mock') as
-      | 'mock'
-      | 'doku',
+    // In production builds, default to 'doku' — silently falling back to
+    // 'mock' (which auto-resolves in 3 s) is a critical safety bug, since
+    // it would let customers skip payment entirely if the env var was
+    // dropped during deploy. In dev builds, default to 'mock' so offline
+    // UI work doesn't require a Supabase round-trip.
+    provider: (
+      import.meta.env.VITE_PAYMENT_PROVIDER ??
+      (import.meta.env.PROD ? 'doku' : 'mock')
+    ) as 'mock' | 'doku',
     amount: 30_000,
     currency: 'IDR',
     timeoutSec: 300,
@@ -72,3 +78,30 @@ export const appConfig = {
 
 export type TemplateId = (typeof appConfig.templates)[number]['id']
 export type FilterId = (typeof appConfig.filters)[number]['id']
+
+// ── startup diagnostics ────────────────────────────────────────────────────
+// Log the active config so DevTools immediately shows which payment
+// provider and Vite mode the build is running with. Catches the worst
+// silent bug — a production deploy that fell back to the mock provider.
+if (typeof console !== 'undefined') {
+  const tag = '[Pbooth]'
+  const mode = import.meta.env.MODE
+  const provider = appConfig.payment.provider
+  const supabaseSet = !!appConfig.supabase.url && !!appConfig.supabase.anonKey
+
+  console.info(
+    `${tag} mode=${mode} provider=${provider} supabaseConfigured=${supabaseSet}`,
+  )
+  if (import.meta.env.PROD && provider === 'mock') {
+    console.error(
+      `${tag} CRITICAL: production build with MOCK payment provider — ` +
+        'customers can skip payment! Set VITE_PAYMENT_PROVIDER=doku in .env.production.',
+    )
+  }
+  if (provider === 'doku' && !supabaseSet) {
+    console.error(
+      `${tag} DOKU provider selected but Supabase env vars are missing — ` +
+        'create-doku-payment edge function cannot be reached.',
+    )
+  }
+}
