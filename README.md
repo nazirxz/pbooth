@@ -39,6 +39,12 @@ Supabase simultaneously — switching is a single-secret toggle.
 ```bash
 git checkout development
 npm install
+
+# Set up your sandbox env locally (gitignored — values aren't committed)
+cp .env.example .env.development
+# then edit .env.development and fill VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
+# from the Supabase project (or get them from a teammate)
+
 npm run dev          # http://localhost:5173 — uses sandbox DOKU
 ```
 
@@ -57,6 +63,12 @@ See `docs/doku-integration.md` for the full sandbox testing guide.
 git checkout main
 git merge development          # bring forward fixes/features
 npm install
+
+# Set up your production env locally (gitignored)
+cp .env.example .env.production
+# fill in production VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
+# (use a separate Supabase project for prod isolation if possible)
+
 npm run build:web              # web kiosk artefacts → dist-web/
 # or
 npm run build                  # electron build (requires platform tooling)
@@ -68,16 +80,20 @@ the **Production hardening checklist** in
 
 ## Environment files
 
+All `.env*` files are gitignored — values stay on each developer's
+machine. Use `.env.example` as the template:
+
 | File | Tracked? | Purpose |
 |---|---|---|
-| `.env.development` | ✅ committed | sandbox values (no real secrets) |
-| `.env.production` | ✅ committed | production template (no real secrets) |
-| `.env` | 🚫 gitignored | personal/local primary (optional) |
-| `.env.development.local` | 🚫 gitignored | dev-only override (real secrets) |
-| `.env.production.local` | 🚫 gitignored | prod-only override (real secrets) |
+| `.env.example` | ✅ committed | template / onboarding reference |
+| `.env.development` | 🚫 gitignored | sandbox values (loaded by `npm run dev`) |
+| `.env.production` | 🚫 gitignored | production values (loaded by `npm run build`) |
+| `.env` | 🚫 gitignored | fallback for both modes (optional) |
+| `.env.development.local` | 🚫 gitignored | dev-only personal override |
+| `.env.production.local` | 🚫 gitignored | prod-only personal override |
 
-What's safe to commit in `.env.development` / `.env.production`:
-- Supabase URL (public)
+What kiosk env files contain:
+- Supabase URL (public, RLS-protected)
 - Supabase anon key (intentionally public, RLS-protected)
 - `VITE_PAYMENT_PROVIDER`
 
