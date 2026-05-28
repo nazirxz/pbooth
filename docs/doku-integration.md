@@ -278,6 +278,78 @@ VITE_SUPABASE_URL=https://your-prod-project.supabase.co
 VITE_SUPABASE_ANON_KEY=<prod anon>
 ```
 
+## RSA keypair management (Merchant signing key)
+
+The current Checkout flow uses **HMAC-SHA256** with the Secret Key — no
+RSA needed. The DOKU dashboard's "Merchant Public Key" field is for
+**SNAP BI** integrations (a different signing scheme). It's still good
+practice to have a keypair ready in production so that:
+
+- The dashboard field isn't left blank (DOKU treats this as misconfigured
+  for some reports).
+- A future SNAP BI migration only requires a code change, not key
+  provisioning + DOKU-side review (which can take days).
+
+The key never leaves the Supabase Edge Function environment. Kiosk
+bundles do not contain it.
+
+### Generate a fresh keypair (one-time per environment)
+
+Do this in a temp dir, not the repo:
+
+```bash
+TMPDIR=$(mktemp -d)
+cd "$TMPDIR"
+
+openssl genrsa -out merchant-private.pem 2048
+openssl rsa -in merchant-private.pem -pubout -out merchant-public.pem
+
+# Sanity: modulus on both files must match
+openssl rsa -in merchant-private.pem -modulus -noout
+openssl rsa -in merchant-public.pem -pubin -modulus -noout
+```
+
+### Upload the public key to DOKU
+
+1. DOKU back office → **API Keys** section
+2. Find **Merchant Public Key** → click **Edit Merchant Public Key**
+3. Paste the contents of `merchant-public.pem` (including the
+   `-----BEGIN PUBLIC KEY-----` / `-----END PUBLIC KEY-----` markers)
+4. Submit
+
+### Store the private key as a Supabase secret
+
+```bash
+SUPABASE_ACCESS_TOKEN=<pat> supabase secrets set \
+  DOKU_PROD_MERCHANT_PRIVATE_KEY="$(cat $TMPDIR/merchant-private.pem)"
+```
+
+For sandbox, replace the secret name with
+`DOKU_SANDBOX_MERCHANT_PRIVATE_KEY`.
+
+### Securely destroy the local copy
+
+```bash
+rm -fP "$TMPDIR"/*.pem   # -P overwrites then deletes (macOS)
+rmdir "$TMPDIR"
+```
+
+Verify nothing leaked into the repo:
+
+```bash
+find . -name '*.pem' -not -path './node_modules/*'
+```
+
+Should return nothing. PEM files in the project tree are a finding —
+investigate and rotate immediately if any are found.
+
+### Current status
+
+| Env | Public key uploaded to DOKU | Private key in Supabase | Notes |
+|---|---|---|---|
+| sandbox | ✅ (pre-existing) | ⚠️ not stored locally | Original keypair source unknown — the public key in the sandbox dashboard might not be reproducible. Re-generate if SNAP BI is needed. |
+| production | ✅ (uploaded by us) | ✅ `DOKU_PROD_MERCHANT_PRIVATE_KEY` | Generated 2026-05-28. Modulus matches. |
+
 ## Branch convention
 
 This project uses two long-lived branches:
