@@ -17,6 +17,8 @@ const CRITICAL_AT_MS = 15 * 1000             // red when ≤ 15 sec remaining
 export function SessionTimer() {
   const paidAt = useSession((s) => s.paidAt)
   const previewStartedAt = useSession((s) => s.previewStartedAt)
+  const screen = useSession((s) => s.screen)
+  const reset = useSession((s) => s.reset)
   const [now, setNow] = useState(() => Date.now())
 
   const active = previewStartedAt ?? paidAt
@@ -27,6 +29,17 @@ export function SessionTimer() {
     const t = setInterval(() => setNow(Date.now()), 500)
     return () => clearInterval(t)
   }, [active])
+
+  // Auto-reset to home when session expires (except on preview screen which
+  // handles its own reset)
+  useEffect(() => {
+    if (!active) return
+    const remaining = Math.max(0, duration - (Date.now() - active))
+    if (remaining === 0 && screen !== 'preview') {
+      const t = setTimeout(() => reset(), 1500)
+      return () => clearTimeout(t)
+    }
+  }, [active, duration, screen, reset, now])
 
   if (!active) return null
 
