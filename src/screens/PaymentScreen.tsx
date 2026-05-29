@@ -123,6 +123,18 @@ export function PaymentScreen() {
     return () => clearInterval(t)
   }, [session])
 
+  // ── 4. auto-reset to home on terminal failure states ────────────────────
+  // When the payment expires, gets cancelled, or fails, the user is no
+  // longer able to complete the flow on this screen. Show the status for a
+  // brief moment so they can read it, then drop back to the welcome screen
+  // so the kiosk is ready for the next customer.
+  const reset = useSession((s) => s.reset)
+  useEffect(() => {
+    if (status !== 'expired' && status !== 'cancelled' && status !== 'failed') return
+    const t = setTimeout(() => reset(), 3000)
+    return () => clearTimeout(t)
+  }, [status, reset])
+
   const cancel = async () => {
     if (session) await getPaymentProvider().cancel(session.id)
     if (paymentRowIdRef.current) await dbUpdatePaymentStatus(paymentRowIdRef.current, 'cancelled')
