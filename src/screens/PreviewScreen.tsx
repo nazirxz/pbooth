@@ -41,6 +41,8 @@ export function PreviewScreen() {
   const [uploadState, setUploadState] = useState<UploadState>('idle')
   const [liveState, setLiveState] = useState<LiveState>('idle')
   const [liveError, setLiveError] = useState<string | null>(null)
+  const [printState, setPrintState] = useState<'idle' | 'printing' | 'success' | 'error'>('idle')
+  const [printError, setPrintError] = useState<string | null>(null)
 
   // 3-minute "waiting for print" window — kicks the session timer into preview
   // mode and auto-returns to the welcome screen when it expires.
@@ -166,6 +168,20 @@ export function PreviewScreen() {
     a.click()
   }
 
+  const handlePrint = async () => {
+    if (!composed || !window.pbooth?.print) return
+    setPrintState('printing')
+    setPrintError(null)
+    try {
+      await window.pbooth.print(composed.dataUrl)
+      setPrintState('success')
+      setTimeout(() => setPrintState('idle'), 3000)
+    } catch (err) {
+      setPrintState('error')
+      setPrintError(err instanceof Error ? err.message : 'Print failed')
+    }
+  }
+
   return (
     <div className="absolute inset-0 grid grid-rows-[auto_1fr]">
       <ChannelBar channel="06" label="PREVIEW" />
@@ -198,7 +214,21 @@ export function PreviewScreen() {
 
           <LiveStatus state={liveState} error={liveError} />
 
+          {printState === 'error' && printError && (
+            <div className="font-crt text-sm text-red-400 bg-black/40 border border-red-400/30 rounded px-3 py-2">
+              Print error: {printError}
+            </div>
+          )}
+
           <div className="flex gap-4 flex-wrap mt-2">
+            <TVButton
+              variant="primary"
+              size="lg"
+              onClick={handlePrint}
+              disabled={!composed || printState === 'printing'}
+            >
+              {printState === 'printing' ? '⏳ PRINTING...' : printState === 'success' ? '✓ PRINTED' : '🖨 PRINT NOW'}
+            </TVButton>
             <TVButton variant="secondary" size="md" onClick={download} disabled={!composed}>
               ⬇ DOWNLOAD
             </TVButton>

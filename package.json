@@ -9,11 +9,46 @@
     "dev": "vite",
     "dev:web": "PBOOTH_TARGET=web vite",
     "build": "tsc -b && vite build && electron-builder",
+    "build:win": "tsc -b && vite build && electron-builder --win --x64",
     "build:web": "PBOOTH_TARGET=web tsc -b && PBOOTH_TARGET=web vite build",
+    "pack": "tsc -b && vite build && electron-builder --dir",
     "preview": "vite preview",
     "preview:web": "PBOOTH_TARGET=web vite preview --port 4173",
     "typecheck": "tsc -b --noEmit",
     "electron:dev": "vite"
+  },
+  "build": {
+    "appId": "com.euorna.pbooth",
+    "productName": "Pbooth",
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Pbooth",
+      "deleteAppDataOnUninstall": false
+    }
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
