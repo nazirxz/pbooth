@@ -64,3 +64,50 @@ app.on('will-quit', () => globalShortcut.unregisterAll())
 
 ipcMain.handle('app:quit', () => app.quit())
 ipcMain.handle('app:version', () => app.getVersion())
+
+ipcMain.handle('printer:print', async (_event, dataUrl: string) => {
+  const win = BrowserWindow.getFocusedWindow()
+  if (!win) throw new Error('No focused window for print')
+
+  return new Promise<void>((resolve, reject) => {
+    const printHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          * { margin: 0; padding: 0; }
+          body { display: flex; justify-content: center; align-items: center; }
+          img { max-width: 100%; height: auto; }
+        </style>
+      </head>
+      <body><img src="${dataUrl}" /></body>
+      </html>
+    `
+
+    const printWin = new BrowserWindow({
+      show: false,
+      webPreferences: { offscreen: true },
+    })
+
+    printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(printHTML)}`)
+
+    printWin.webContents.once('did-finish-load', () => {
+      printWin.webContents.print(
+        {
+          silent: true,
+          deviceName: 'DNP',
+          printBackground: true,
+          margins: { marginType: 'none' },
+        },
+        (success, failureReason) => {
+          printWin.close()
+          if (success) {
+            resolve()
+          } else {
+            reject(new Error(failureReason || 'Print failed'))
+          }
+        },
+      )
+    })
+  })
+})

@@ -12,6 +12,14 @@ interface ImportMeta {
   readonly env: ImportMetaEnv
 }
 
+interface Window {
+  pbooth?: {
+    quit: () => Promise<void>
+    version: () => Promise<string>
+    print: (dataUrl: string) => Promise<void>
+  }
+}
+
 declare module '*.jpeg' {
   const src: string
   export default src

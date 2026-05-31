@@ -61,6 +61,15 @@ export const appConfig = {
     // unreachable from a customer's phone, so the QR must point at this domain.
     baseUrl: (import.meta.env.VITE_SHARE_BASE_URL ?? '').replace(/\/$/, ''),
   },
+  printer: {
+    enabled: true,
+    // Device name as it appears in Windows printer list. Leave empty to use
+    // the system default printer. DNP printers typically show as "DNP DS620"
+    // or similar — check Control Panel → Devices and Printers for exact name.
+    deviceName: 'DNP',
+    // Silent print (no OS dialog). Set false for testing with print preview.
+    silent: true,
+  },
   templates: [
     { id: 'duo-2', label: 'DUO', frames: 2, layout: 'vertical' },
     { id: 'strip-3', label: 'TRIO', frames: 3, layout: 'vertical' },
