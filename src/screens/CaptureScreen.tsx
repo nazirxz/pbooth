@@ -6,7 +6,7 @@ import { RetroCountdown } from '@/components/RetroCountdown'
 import { appConfig } from '@/config/app-config'
 import { useSession } from '@/state/session-store'
 import { createCameraSource } from '@/lib/camera'
-import { uploadPhoto } from '@/lib/supabase/photos'
+import { uploadPhoto } from '@/lib/storage'
 
 export function CaptureScreen() {
   const goTo = useSession((s) => s.goTo)

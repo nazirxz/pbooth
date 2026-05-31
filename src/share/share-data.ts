@@ -1,5 +1,6 @@
 import { getSupabase } from '@/lib/supabase/client'
 import { appConfig } from '@/config/app-config'
+import { getR2SignedUrl } from '@/lib/r2/photos'
 
 export interface SharedPhoto {
   index: number
@@ -41,18 +42,48 @@ export async function fetchSharedSession(sessionId: string): Promise<SharedSessi
 
   const photoEntries: SharedPhoto[] = []
   for (const p of photos ?? []) {
-    const { data: signed, error: signErr } = await sb.storage
-      .from(appConfig.supabase.photosBucket)
-      .createSignedUrl(p.storage_path, SIGNED_URL_TTL)
-    if (signErr || !signed) continue
-    photoEntries.push({ index: p.frame_index, url: signed.signedUrl })
+    // Detect storage backend from path
+    const isR2 = !p.storage_path.includes('supabase')
+
+    if (isR2) {
+      // R2 storage - use R2 presigned URL
+      const signedUrl = await getR2SignedUrl(p.storage_path, SIGNED_URL_TTL)
+      if (signedUrl) {
+        photoEntries.push({ index: p.frame_index, url: signedUrl })
+      }
+    } else {
+      // Supabase storage - use Supabase signed URL
+      const { data: signed, error: signErr } = await sb.storage
+        .from(appConfig.supabase.photosBucket)
+        .createSignedUrl(p.storage_path, SIGNED_URL_TTL)
+      if (signErr || !signed) continue
+      photoEntries.push({ index: p.frame_index, url: signed.signedUrl })
+    }
   }
 
   return {
     sessionId: session.id,
-    composedUrl: session.final_image_url ?? null,
-    liveVideoUrl: session.live_video_url ?? null,
+    composedUrl: await resolvePublicUrl(session.final_image_url),
+    liveVideoUrl: await resolvePublicUrl(session.live_video_url),
     photos: photoEntries,
     createdAt: session.created_at ?? null,
   }
+}
+
+/**
+ * Resolve public URLs for composed/live assets. If the URL is already a full URL
+ * (Supabase public URL or R2 public URL), return as-is. If it's an R2 path without
+ * public URL configured, generate a presigned URL.
+ */
+async function resolvePublicUrl(url: string | null): Promise<string | null> {
+  if (!url) return null
+
+  // Already a full URL (starts with http/https)
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+
+  // R2 path without public URL - generate presigned URL
+  const signedUrl = await getR2SignedUrl(url, SIGNED_URL_TTL)
+  return signedUrl
 }

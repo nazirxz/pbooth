@@ -55,6 +55,20 @@ export const appConfig = {
     photosBucket: 'photos',
     composedBucket: 'composed',
   },
+  storage: {
+    backend: (import.meta.env.VITE_STORAGE_BACKEND ?? 'supabase') as 'supabase' | 'r2',
+  },
+  r2: {
+    accountId: import.meta.env.VITE_R2_ACCOUNT_ID ?? '',
+    accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID ?? '',
+    secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY ?? '',
+    bucketName: import.meta.env.VITE_R2_BUCKET_NAME ?? 'pbooth-photos',
+    endpoint: import.meta.env.VITE_R2_ACCOUNT_ID
+      ? `https://${import.meta.env.VITE_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
+      : '',
+    publicUrl: import.meta.env.VITE_R2_PUBLIC_URL ?? '',
+    region: 'auto',
+  },
   share: {
     // Public URL where the share page is deployed (e.g. https://pbooth.vercel.app).
     // The kiosk runs in Electron — window.location.origin there is `file://` and
@@ -97,9 +111,11 @@ if (typeof console !== 'undefined') {
   const mode = import.meta.env.MODE
   const provider = appConfig.payment.provider
   const supabaseSet = !!appConfig.supabase.url && !!appConfig.supabase.anonKey
+  const storageBackend = appConfig.storage.backend
+  const r2Set = !!appConfig.r2.accessKeyId && !!appConfig.r2.secretAccessKey
 
   console.info(
-    `${tag} mode=${mode} provider=${provider} supabaseConfigured=${supabaseSet}`,
+    `${tag} mode=${mode} provider=${provider} supabaseConfigured=${supabaseSet} storage=${storageBackend} r2Configured=${r2Set}`,
   )
   if (import.meta.env.PROD && provider === 'mock') {
     console.error(
