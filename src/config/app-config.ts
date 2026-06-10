@@ -33,7 +33,7 @@ export const appConfig = {
       import.meta.env.VITE_PAYMENT_PROVIDER ??
       (import.meta.env.PROD ? 'doku' : 'mock')
     ) as 'mock' | 'doku',
-    amount: 30_000,
+    amount: 37_000,
     currency: 'IDR',
     timeoutSec: 300,
     // Show "DEV: SIMULATE PAID" only in Vite dev mode (`npm run dev`).

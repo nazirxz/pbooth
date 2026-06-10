@@ -24,7 +24,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      devTools: isDev,
+      // TODO: revert to `isDev` after debugging QRIS issue on other laptops
+      devTools: true,
       spellcheck: false,
       backgroundThrottling: false,
     },
