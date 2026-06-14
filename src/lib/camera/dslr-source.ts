@@ -1,5 +1,4 @@
 import { appConfig } from '@/config/app-config'
-import { getSelectedDeviceId } from '@/state/device-store'
 import { DigiCamClient } from './digicam-client'
 import { WebcamSource } from './webcam-source'
 import type { CameraSource } from './types'
