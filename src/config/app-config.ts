@@ -9,17 +9,45 @@ export const appConfig = {
     orientation: 'landscape' as const,
   },
   camera: {
-    source: 'webcam' as 'webcam' | 'dslr',
+    // 'webcam' = laptop/USB webcam (PoC, dev).
+    // 'dslr'   = Canon EOS via digiCamControl HTTP API for tethered capture
+    //            (manual mode + on-body flash), HDMI capture card for live preview.
+    source: (import.meta.env.VITE_CAMERA_SOURCE ?? 'webcam') as 'webcam' | 'dslr',
     webcam: {
       facingMode: 'user',
       width: 1280,
       height: 960,
     },
+    dslr: {
+      /**
+       * digiCamControl HTTP API endpoint. Default port from the installer.
+       * Enable "Web server" in digiCamControl: File → Settings → Webserver.
+       */
+      apiUrl: (import.meta.env.VITE_DCC_URL ?? 'http://localhost:5513').replace(/\/$/, ''),
+      /**
+       * Manual shooting parameters applied to the camera before each capture.
+       * Strings match digiCamControl's expected property values (camera-dependent).
+       * Override per kiosk via env vars when lighting differs.
+       */
+      capture: {
+        iso: import.meta.env.VITE_DCC_ISO ?? '400',
+        shutter: import.meta.env.VITE_DCC_SHUTTER ?? '1/125',
+        aperture: import.meta.env.VITE_DCC_APERTURE ?? '5.6',
+      },
+      /**
+       * If digiCamControl is unreachable on start (dev machine without rig),
+       * fall back silently to the webcam pipeline so UI work is unblocked.
+       * Set false in production to fail loudly instead.
+       */
+      fallbackToWebcam: import.meta.env.VITE_DCC_FALLBACK !== 'false',
+      /** Polling timeout for the file-ready check after a capture, in ms. */
+      captureTimeoutMs: 8_000,
+    },
   },
   capture: {
     // Number of shots per session is driven by the selected template's `frames`,
     // not a global config — so picking TRIO captures 3, DUO captures 2, etc.
-    countdownSec: 3,
+    countdownSec: 5,
     delayBetweenFramesMs: 800,
   },
   payment: {

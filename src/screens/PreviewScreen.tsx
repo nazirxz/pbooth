@@ -9,7 +9,7 @@ import { composeStrip } from '@/lib/compose'
 import { uploadComposed, uploadLiveAsset } from '@/lib/storage'
 import { dbUpdateSession } from '@/lib/supabase/sessions'
 import { appConfig } from '@/config/app-config'
-import { buildGifFromPhotos } from '@/lib/gif-encoder'
+import { buildVideoFromPhotos } from '@/lib/video-encoder'
 
 type UploadState =
   | 'idle'
@@ -34,10 +34,10 @@ export function PreviewScreen() {
   const startPreviewCountdown = useSession((s) => s.startPreviewCountdown)
   const theme = useTheme((s) => s.theme)
   const borderId = useDecoration((s) => s.borderId)
+  const stripColor = useDecoration((s) => s.stripColor)
   const placedStickers = useDecoration((s) => s.stickers)
 
   const [qrImg, setQrImg] = useState<string>('')
-  const [shareUrl, setShareUrl] = useState<string>('')
   const [uploadState, setUploadState] = useState<UploadState>('idle')
   const [liveState, setLiveState] = useState<LiveState>('idle')
   const [liveError, setLiveError] = useState<string | null>(null)
@@ -59,7 +59,6 @@ export function PreviewScreen() {
     if (!sessionId) return
     const base = appConfig.share.baseUrl || window.location.origin
     const url = `${base}/s/${sessionId}`
-    setShareUrl(url)
     let cancelled = false
     QRCode.toDataURL(url, {
       width: 320,
@@ -88,7 +87,7 @@ export function PreviewScreen() {
           template,
           filterId: filter,
           theme,
-          decoration: { borderId, stickers: placedStickers },
+          decoration: { borderId, stripColor, stickers: placedStickers },
         })
         if (cancelled) return
         const dataUrl = await blobToDataUrl(blob)
@@ -113,21 +112,23 @@ export function PreviewScreen() {
           setLiveError(null)
           void (async () => {
             try {
-              let gif = liveAsset
-              if (!gif) {
+              let video = liveAsset
+              if (!video) {
                 setLiveState('encoding')
                 const filterCss = theme.filters.find((f) => f.id === filter)?.css ?? 'none'
-                gif = await buildGifFromPhotos({
+                video = await buildVideoFromPhotos({
                   photos,
-                  frameDelayMs: 600,
+                  width: 1280,
+                  frameDelayMs: 500,
+                  loopCount: 3,
                   filterCss,
                 })
                 if (cancelled) return
-                setLiveAsset(gif)
+                setLiveAsset(video)
               }
 
               setLiveState('uploading')
-              const liveUrl = await uploadLiveAsset(sessionId, gif.blob, gif.ext)
+              const liveUrl = await uploadLiveAsset(sessionId, video.blob, video.ext)
               if (!liveUrl) {
                 setLiveState('error')
                 setLiveError('upload failed (cek bucket "composed" + storage policy)')
@@ -158,15 +159,7 @@ export function PreviewScreen() {
     return () => {
       cancelled = true
     }
-  }, [composed, photos, template, filter, sessionId, setComposed, theme, borderId, placedStickers, liveAsset, setLiveAsset])
-
-  const download = () => {
-    if (!composed) return
-    const a = document.createElement('a')
-    a.href = composed.dataUrl
-    a.download = `pbooth_${Date.now()}.jpg`
-    a.click()
-  }
+  }, [composed, photos, template, filter, sessionId, setComposed, theme, borderId, stripColor, placedStickers, liveAsset, setLiveAsset])
 
   const handlePrint = async () => {
     if (!composed || !window.pbooth?.print) return
@@ -210,7 +203,7 @@ export function PreviewScreen() {
             (NUNGGU PRINT)
           </div>
 
-          <QRPanel state={uploadState} qrImg={qrImg} sessionId={sessionId} shareUrl={shareUrl} />
+          <QRPanel state={uploadState} qrImg={qrImg} sessionId={sessionId} />
 
           <LiveStatus state={liveState} error={liveError} />
 
@@ -229,9 +222,6 @@ export function PreviewScreen() {
             >
               {printState === 'printing' ? '⏳ PRINTING...' : printState === 'success' ? '✓ PRINTED' : '🖨 PRINT NOW'}
             </TVButton>
-            <TVButton variant="secondary" size="md" onClick={download} disabled={!composed}>
-              ⬇ DOWNLOAD
-            </TVButton>
             <TVButton variant="primary" size="lg" onClick={reset}>
               ▶ NEW SESSION
             </TVButton>
@@ -246,12 +236,10 @@ function QRPanel({
   state,
   qrImg,
   sessionId,
-  shareUrl,
 }: {
   state: UploadState
   qrImg: string
   sessionId: string | null
-  shareUrl: string
 }) {
   // Show QR as soon as we have one — the share page handles partial state.
   if (qrImg && sessionId) {
@@ -265,22 +253,6 @@ function QRPanel({
             <UploadStatusInline state={state} />
           </div>
         </div>
-        {shareUrl && (
-          <div className="border-t border-crt-cream/15 pt-2">
-            <div className="font-crt text-xs text-crt-cream/40 tracking-widest mb-1">
-              ATAU BUKA LINK INI
-            </div>
-            <a
-              href={shareUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block font-mono text-xs text-crt-amber/85 break-all leading-snug select-text touch-press"
-              style={{ pointerEvents: 'auto' }}
-            >
-              {shareUrl}
-            </a>
-          </div>
-        )}
       </div>
     )
   }

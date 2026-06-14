@@ -81,7 +81,7 @@ export function PaymentScreen() {
           if (newStatus === 'paid') {
             markPaid()
             if (sessionIdRef.current) await dbUpdateSession(sessionIdRef.current, { status: 'paid' })
-            setTimeout(() => goTo('template'), 900)
+            setTimeout(() => goTo('instructions'), 900)
           }
         })
       } catch (err) {
@@ -252,18 +252,31 @@ export function PaymentScreen() {
                 variant="secondary"
                 size="md"
                 onClick={async () => {
-                  // Route the dev sim through whichever provider is active.
-                  // - mock: in-memory shortcut, fires the listener directly
-                  // - doku: edge function flips the row in Supabase, the
-                  //         existing Realtime subscription does the rest.
+                  console.log('[PaymentScreen] DEV simulate paid clicked', {
+                    provider: getPaymentProvider().name,
+                    paymentRowId: paymentRowIdRef.current,
+                    sessionId: sessionIdRef.current,
+                  })
                   if (getPaymentProvider().name === 'doku') {
-                    if (paymentRowIdRef.current) {
-                      try {
-                        await simulateDokuPaid(paymentRowIdRef.current)
-                      } catch (err) {
-                        console.error('[PaymentScreen] simulateDokuPaid failed', err)
-                      }
+                    if (!paymentRowIdRef.current) {
+                      console.warn('[PaymentScreen] no paymentRowId yet — bootstrap still running')
+                      return
                     }
+                    try {
+                      await simulateDokuPaid(paymentRowIdRef.current)
+                      console.log('[PaymentScreen] DB updated to paid, advancing locally')
+                    } catch (err) {
+                      console.error('[PaymentScreen] simulateDokuPaid failed', err)
+                      // Continue anyway — UI advance is the dev intent.
+                    }
+                    // Force-advance locally so the dev button works even when
+                    // Realtime is down (sandbox-flake, websocket blocked, etc).
+                    setStatus('paid')
+                    markPaid()
+                    if (sessionIdRef.current) {
+                      await dbUpdateSession(sessionIdRef.current, { status: 'paid' })
+                    }
+                    setTimeout(() => goTo('instructions'), 900)
                   } else {
                     simulatePaid(session.id)
                   }

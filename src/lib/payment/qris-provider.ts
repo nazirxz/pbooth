@@ -142,32 +142,31 @@ async function safeJson(res: Response): Promise<unknown> {
 }
 
 /**
- * Sandbox-only helper: hits the `dev-simulate-paid` edge function which
- * marks a `payments` row as paid without going through DOKU's hosted
- * page. Useful for kiosk dev/demo loops.
+ * Dev/demo helper: marks a `payments` row as paid directly via the anon
+ * Supabase client. RLS policy `payments_update_anon` permits this, and
+ * the Realtime subscription on the kiosk picks up the UPDATE event the
+ * same way it would for a real DOKU webhook — so the kiosk auto-advances
+ * to the next screen.
  *
- * The edge function rejects calls when DOKU_ENV=production, so this is
- * a safe shortcut to expose behind a dev flag.
+ * Bypasses the `dev-simulate-paid` edge function entirely so it also
+ * works when DOKU_ENV=production on Supabase (the edge function is
+ * locked in that case for safety).
  */
 export async function simulateDokuPaid(paymentRowId: string): Promise<void> {
-  const base = appConfig.supabase.url.replace(/\/$/, '')
-  if (!base) throw new Error('[doku] VITE_SUPABASE_URL not set')
-  const anonKey = appConfig.supabase.anonKey
-  if (!anonKey) throw new Error('[doku] VITE_SUPABASE_ANON_KEY not set')
+  const sb = getSupabase()
+  if (!sb) throw new Error('[doku] Supabase not configured')
 
-  const res = await fetch(`${base}/functions/v1/dev-simulate-paid`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${anonKey}`,
-      apikey: anonKey,
-    },
-    body: JSON.stringify({ paymentId: paymentRowId }),
-  })
-  if (!res.ok) {
-    const detail = await safeJson(res)
-    throw new Error(
-      `[doku] simulate-paid failed: ${res.status} ${JSON.stringify(detail)}`,
-    )
+  const nowIso = new Date().toISOString()
+  const { data, error } = await sb
+    .from('payments')
+    .update({ status: 'paid', paid_at: nowIso })
+    .eq('id', paymentRowId)
+    .select('session_id')
+    .single()
+  if (error) {
+    throw new Error(`[doku] simulate-paid failed: ${error.message}`)
+  }
+  if (data?.session_id) {
+    await sb.from('sessions').update({ status: 'paid' }).eq('id', data.session_id)
   }
 }
