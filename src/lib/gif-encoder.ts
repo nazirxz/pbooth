@@ -60,6 +60,10 @@ export async function buildGifFromPhotos(opts: BuildGifOpts): Promise<BuildGifRe
   canvas.height = height
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) throw new Error('buildGifFromPhotos: 2d context unavailable')
+  // High-quality bilinear downscale — defaults to 'low' in some browsers
+  // which gives noticeably softer faces when going from 1280 → 540.
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
 
   // Render every frame into a pixel buffer.
   const frameData: Uint8ClampedArray[] = []

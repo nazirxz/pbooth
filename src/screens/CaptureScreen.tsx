@@ -5,8 +5,10 @@ import { ChannelBar } from '@/components/ChannelBar'
 import { RetroCountdown } from '@/components/RetroCountdown'
 import { appConfig } from '@/config/app-config'
 import { useSession } from '@/state/session-store'
+import { useTheme } from '@/state/theme-store'
 import { createCameraSource } from '@/lib/camera'
 import { uploadPhoto } from '@/lib/storage'
+import { buildVideoFromPhotos } from '@/lib/video-encoder'
 
 export function CaptureScreen() {
   const goTo = useSession((s) => s.goTo)
@@ -17,6 +19,7 @@ export function CaptureScreen() {
   const sessionId = useSession((s) => s.sessionId)
   const photos = useSession((s) => s.photos)
   const setLiveAsset = useSession((s) => s.setLiveAsset)
+  const theme = useTheme((s) => s.theme)
 
   const tmpl = appConfig.templates.find((t) => t.id === template)!
   const frameCount = tmpl.frames
@@ -63,6 +66,24 @@ export function CaptureScreen() {
       // captured stills downstream, so we don't need a live stream anymore.
       src.stop()
 
+      // Kick off the HD live-photo VIDEO encode in the background while we
+      // transition. MediaRecorder runs in real-time (encode time ≈ playback
+      // time), so we start as early as possible and let it finish during
+      // strip compose/upload on PreviewScreen.
+      const captured = useSession.getState().photos
+      if (captured.length > 0) {
+        const filterCss = theme.filters.find((f) => f.id === filter)?.css ?? 'none'
+        void buildVideoFromPhotos({
+          photos: captured,
+          width: 1280,
+          frameDelayMs: 500,
+          loopCount: 3,
+          filterCss,
+        })
+          .then((video) => setLiveAsset(video))
+          .catch((e) => console.warn('[capture] background video encode failed', e))
+      }
+
       if (!cancelled) {
         await wait(200)
         goTo('decorate')
@@ -74,7 +95,7 @@ export function CaptureScreen() {
       cancelled = true
       src.stop()
     }
-  }, [frameCount, addPhoto, clearPhotos, goTo, sessionId, setLiveAsset])
+  }, [frameCount, addPhoto, clearPhotos, goTo, sessionId, setLiveAsset, filter, theme])
 
   return (
     <div className="absolute inset-0 grid grid-rows-[auto_1fr]">

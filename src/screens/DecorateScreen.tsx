@@ -10,7 +10,7 @@ import { STICKERS, getSticker } from '@/lib/stickers'
 import { computePaperLayout, type PaperLayout } from '@/lib/strip-layout'
 import { buildGifFromPhotos } from '@/lib/gif-encoder'
 
-type Tab = 'border' | 'sticker'
+type Step = 'sticker' | 'border'
 
 export function DecorateScreen() {
   const goTo = useSession((s) => s.goTo)
@@ -22,9 +22,11 @@ export function DecorateScreen() {
   const theme = useTheme((s) => s.theme)
 
   const borderId = useDecoration((s) => s.borderId)
+  const stripColor = useDecoration((s) => s.stripColor)
   const stickers = useDecoration((s) => s.stickers)
   const selectedId = useDecoration((s) => s.selectedStickerId)
   const setBorder = useDecoration((s) => s.setBorder)
+  const setStripColor = useDecoration((s) => s.setStripColor)
   const addSticker = useDecoration((s) => s.addSticker)
   const moveSticker = useDecoration((s) => s.moveSticker)
   const removeSticker = useDecoration((s) => s.removeSticker)
@@ -32,7 +34,7 @@ export function DecorateScreen() {
   const resetDecoration = useDecoration((s) => s.reset)
   const setStickerScale = useDecoration((s) => s.setStickerScale)
 
-  const [tab, setTab] = useState<Tab>('border')
+  const [step, setStep] = useState<Step>('sticker')
 
   // Reset decoration for a fresh session.
   useEffect(() => {
@@ -80,6 +82,7 @@ export function DecorateScreen() {
           filterId={filter}
           layout={layout}
           borderId={borderId}
+          stripColor={stripColor}
           themeId={theme.id}
           stickers={stickers}
           selectedId={selectedId}
@@ -91,33 +94,55 @@ export function DecorateScreen() {
 
         <div className="flex flex-col min-h-0 gap-4">
           <div className="flex gap-3">
-            <TabButton active={tab === 'border'} onClick={() => setTab('border')}>
-              BORDERS
-            </TabButton>
-            <TabButton active={tab === 'sticker'} onClick={() => setTab('sticker')}>
-              STICKERS
-            </TabButton>
+            <StepBadge
+              n={1}
+              label="STICKERS"
+              active={step === 'sticker'}
+              onClick={() => setStep('sticker')}
+            />
+            <StepBadge
+              n={2}
+              label="BORDER"
+              active={step === 'border'}
+              onClick={() => setStep('border')}
+            />
           </div>
 
           <div className="flex-1 overflow-y-auto min-h-0 pr-1">
-            {tab === 'border' ? (
-              <BorderGrid
-                borders={availableBorders}
-                selectedId={borderId}
-                onPick={setBorder}
-              />
-            ) : (
+            {step === 'sticker' ? (
               <StickerGrid onPick={(a) => addSticker(a)} />
+            ) : (
+              <div className="flex flex-col gap-4">
+                <BorderGrid
+                  borders={availableBorders}
+                  selectedId={borderId}
+                  onPick={setBorder}
+                />
+                <StripColorPicker color={stripColor} onChange={setStripColor} />
+              </div>
             )}
           </div>
 
           <div className="flex flex-wrap gap-3 justify-between">
-            <TVButton variant="ghost" size="md" onClick={() => goTo('preview')}>
-              ⏭ SKIP
-            </TVButton>
-            <TVButton variant="primary" size="lg" onClick={() => goTo('preview')}>
-              DONE ▶
-            </TVButton>
+            {step === 'sticker' ? (
+              <>
+                <TVButton variant="ghost" size="md" onClick={() => goTo('preview')}>
+                  ⏭ SKIP
+                </TVButton>
+                <TVButton variant="primary" size="lg" onClick={() => setStep('border')}>
+                  NEXT ▶
+                </TVButton>
+              </>
+            ) : (
+              <>
+                <TVButton variant="ghost" size="md" onClick={() => setStep('sticker')}>
+                  ◀ BACK
+                </TVButton>
+                <TVButton variant="primary" size="lg" onClick={() => goTo('preview')}>
+                  DONE ▶
+                </TVButton>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -125,26 +150,38 @@ export function DecorateScreen() {
   )
 }
 
-function TabButton({
+function StepBadge({
+  n,
+  label,
   active,
-  children,
   onClick,
 }: {
+  n: number
+  label: string
   active: boolean
-  children: React.ReactNode
   onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
       className={clsx(
-        'touch-press flex-1 py-3 border-2 rounded-xl font-crt text-xl tracking-widest',
+        'touch-press flex-1 py-3 border-2 rounded-xl font-crt text-xl tracking-widest flex items-center justify-center gap-2',
         active
           ? 'border-crt-phosphor bg-crt-phosphor/15 text-crt-phosphor'
           : 'border-crt-cream/30 bg-black/40 text-crt-cream',
       )}
     >
-      {children}
+      <span
+        className={clsx(
+          'inline-flex items-center justify-center w-7 h-7 rounded-full text-base font-bold border',
+          active
+            ? 'border-crt-phosphor bg-crt-phosphor text-black'
+            : 'border-crt-cream/40 text-crt-cream/80',
+        )}
+      >
+        {n}
+      </span>
+      {label}
     </button>
   )
 }
@@ -156,6 +193,7 @@ function StripStage(props: {
   filterId: string
   layout: PaperLayout
   borderId: string
+  stripColor: string
   themeId: string
   stickers: PlacedSticker[]
   selectedId: string | null
@@ -169,6 +207,7 @@ function StripStage(props: {
     filterId,
     layout,
     borderId,
+    stripColor,
     themeId,
     stickers,
     selectedId,
@@ -189,7 +228,7 @@ function StripStage(props: {
     const ctx = canvas.getContext('2d')!
 
     // paper
-    ctx.fillStyle = '#f5e6c8'
+    ctx.fillStyle = stripColor
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     const filterCss = FILTER_CSS_MAP[filterId] ?? 'none'
@@ -228,7 +267,7 @@ function StripStage(props: {
         ctx.restore()
       }
     })
-  }, [photos, filterId, borderId, layout, themeId])
+  }, [photos, filterId, borderId, stripColor, layout, themeId])
 
   const handleStagePointerDown = (e: React.PointerEvent) => {
     // Tap on stage (outside a sticker) clears selection
@@ -238,10 +277,11 @@ function StripStage(props: {
   return (
     <div
       ref={stageRef}
-      className="relative rounded-2xl overflow-hidden bg-crt-cream shadow-[0_0_40px_rgba(0,0,0,0.4)]"
+      className="relative rounded-2xl overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.4)]"
       style={{
         aspectRatio: `${layout.paper.w} / ${layout.paper.h}`,
         height: '100%',
+        background: stripColor,
       }}
       onPointerDown={handleStagePointerDown}
     >
@@ -446,6 +486,62 @@ function BorderGrid({
           <div className="text-lg tracking-widest text-crt-cream">{b.name}</div>
         </button>
       ))}
+    </div>
+  )
+}
+
+const STRIP_COLOR_PRESETS = ['#224a34', '#a9d099', '#000000', '#ffffff']
+
+function StripColorPicker({
+  color,
+  onChange,
+}: {
+  color: string
+  onChange: (color: string) => void
+}) {
+  const isPreset = STRIP_COLOR_PRESETS.some((c) => c.toLowerCase() === color.toLowerCase())
+  return (
+    <div className="border-2 border-crt-cream/20 rounded-xl bg-black/30 p-3 flex flex-col gap-2">
+      <div className="text-xs tracking-widest font-crt text-crt-cream/70">
+        STRIP COLOR
+      </div>
+      <div className="flex flex-wrap gap-2 items-center">
+        {STRIP_COLOR_PRESETS.map((c) => (
+          <button
+            key={c}
+            onClick={() => onChange(c)}
+            className={clsx(
+              'touch-press w-12 h-12 rounded-lg border-2 transition-transform',
+              color.toLowerCase() === c.toLowerCase()
+                ? 'border-crt-phosphor scale-110'
+                : 'border-crt-cream/30',
+            )}
+            style={{ background: c }}
+            title={c}
+          />
+        ))}
+        <label
+          className={clsx(
+            'touch-press w-12 h-12 rounded-lg border-2 relative overflow-hidden cursor-pointer',
+            !isPreset ? 'border-crt-phosphor scale-110' : 'border-crt-cream/30',
+          )}
+          title="Custom color"
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'conic-gradient(from 0deg,#ff3b30,#ffd60a,#2fbf71,#00e5ff,#4b3fff,#a855f7,#ff4fa1,#ff3b30)',
+            }}
+          />
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 opacity-0 cursor-pointer"
+          />
+        </label>
+      </div>
     </div>
   )
 }

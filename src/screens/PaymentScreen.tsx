@@ -22,6 +22,7 @@ export function PaymentScreen() {
   const [session, setSession] = useState<PaymentSession | null>(null)
   const [qrImg, setQrImg] = useState<string>('')
   const [methodView, setMethodView] = useState<MethodView>('qris')
+  const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<PaymentStatus>('pending')
   const [remainingSec, setRemainingSec] = useState<number>(appConfig.payment.timeoutSec)
   const unsubRef = useRef<() => void>()
@@ -34,54 +35,61 @@ export function PaymentScreen() {
     let mounted = true
 
     ;(async () => {
-      const row = await dbCreateSession()
-      if (!mounted) return
-      sessionIdRef.current = row?.id ?? null
-      setSessionId(row?.id ?? null)
+      try {
+        const row = await dbCreateSession()
+        if (!mounted) return
+        sessionIdRef.current = row?.id ?? null
+        setSessionId(row?.id ?? null)
 
-      const pay = await provider.createSession(appConfig.payment.amount, {
-        sessionId: row?.id ?? null,
-      })
-      if (!mounted) return
-      setSession(pay)
-      setPayment(pay)
-
-      // Default tab depends on what the provider returned. If we have a
-      // QRIS string, start there; otherwise fall back to the URL view.
-      if (!isQrisString(pay.qrString) && pay.paymentUrl) {
-        setMethodView('other')
-      }
-
-      let resolvedRowId: string | null = pay.paymentRowId ?? null
-      if (!resolvedRowId) {
-        const payRow = await dbCreatePayment({
+        const pay = await provider.createSession(appConfig.payment.amount, {
           sessionId: row?.id ?? null,
-          provider: provider.name,
-          providerRef: pay.id,
-          amount: pay.amount,
-          qrString: pay.qrString,
-          expiresAt: pay.expiresAt,
         })
-        resolvedRowId = payRow?.id ?? null
-      }
-      if (!mounted) return
-      paymentRowIdRef.current = resolvedRowId
-      setPaymentRowId(resolvedRowId)
-      if (row && resolvedRowId) {
-        await dbUpdateSession(row.id, { payment_id: resolvedRowId })
-      }
+        if (!mounted) return
+        setSession(pay)
+        setPayment(pay)
 
-      unsubRef.current = provider.onStatusChange(pay.id, async (newStatus) => {
-        setStatus(newStatus)
-        if (provider.name !== 'doku' && paymentRowIdRef.current) {
-          await dbUpdatePaymentStatus(paymentRowIdRef.current, newStatus)
+        // Default tab depends on what the provider returned. If we have a
+        // QRIS string, start there; otherwise fall back to the URL view.
+        if (!isQrisString(pay.qrString) && pay.paymentUrl) {
+          setMethodView('other')
         }
-        if (newStatus === 'paid') {
-          markPaid()
-          if (sessionIdRef.current) await dbUpdateSession(sessionIdRef.current, { status: 'paid' })
-          setTimeout(() => goTo('template'), 900)
+
+        let resolvedRowId: string | null = pay.paymentRowId ?? null
+        if (!resolvedRowId) {
+          const payRow = await dbCreatePayment({
+            sessionId: row?.id ?? null,
+            provider: provider.name,
+            providerRef: pay.id,
+            amount: pay.amount,
+            qrString: pay.qrString,
+            expiresAt: pay.expiresAt,
+          })
+          resolvedRowId = payRow?.id ?? null
         }
-      })
+        if (!mounted) return
+        paymentRowIdRef.current = resolvedRowId
+        setPaymentRowId(resolvedRowId)
+        if (row && resolvedRowId) {
+          await dbUpdateSession(row.id, { payment_id: resolvedRowId })
+        }
+
+        unsubRef.current = provider.onStatusChange(pay.id, async (newStatus) => {
+          setStatus(newStatus)
+          if (provider.name !== 'doku' && paymentRowIdRef.current) {
+            await dbUpdatePaymentStatus(paymentRowIdRef.current, newStatus)
+          }
+          if (newStatus === 'paid') {
+            markPaid()
+            if (sessionIdRef.current) await dbUpdateSession(sessionIdRef.current, { status: 'paid' })
+            setTimeout(() => goTo('instructions'), 900)
+          }
+        })
+      } catch (err) {
+        if (!mounted) return
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error('[PaymentScreen] bootstrap failed:', msg, err)
+        setError(msg)
+      }
     })()
 
     return () => {
@@ -157,7 +165,22 @@ export function PaymentScreen() {
             scanners read it reliably. */}
         <div className="relative p-6 bg-crt-cream rounded-2xl shadow-[0_0_40px_rgba(245,230,200,0.15)]">
           <div className="bg-white rounded-lg p-4 grid place-items-center">
-            {qrImg ? (
+            {error ? (
+              <div className="w-[440px] h-[440px] grid place-items-center p-6">
+                <div className="text-center">
+                  <div className="font-pixel text-3xl text-red-600 mb-4">⚠ ERROR</div>
+                  <div className="font-crt text-base text-red-800 leading-relaxed break-words max-w-[380px]">
+                    {error}
+                  </div>
+                  <button
+                    onClick={() => { setError(null); window.location.reload() }}
+                    className="mt-6 font-pixel text-lg px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
+                  >
+                    RETRY
+                  </button>
+                </div>
+              </div>
+            ) : qrImg ? (
               <img
                 src={qrImg}
                 alt="Payment QR"
@@ -229,18 +252,31 @@ export function PaymentScreen() {
                 variant="secondary"
                 size="md"
                 onClick={async () => {
-                  // Route the dev sim through whichever provider is active.
-                  // - mock: in-memory shortcut, fires the listener directly
-                  // - doku: edge function flips the row in Supabase, the
-                  //         existing Realtime subscription does the rest.
+                  console.log('[PaymentScreen] DEV simulate paid clicked', {
+                    provider: getPaymentProvider().name,
+                    paymentRowId: paymentRowIdRef.current,
+                    sessionId: sessionIdRef.current,
+                  })
                   if (getPaymentProvider().name === 'doku') {
-                    if (paymentRowIdRef.current) {
-                      try {
-                        await simulateDokuPaid(paymentRowIdRef.current)
-                      } catch (err) {
-                        console.error('[PaymentScreen] simulateDokuPaid failed', err)
-                      }
+                    if (!paymentRowIdRef.current) {
+                      console.warn('[PaymentScreen] no paymentRowId yet — bootstrap still running')
+                      return
                     }
+                    try {
+                      await simulateDokuPaid(paymentRowIdRef.current)
+                      console.log('[PaymentScreen] DB updated to paid, advancing locally')
+                    } catch (err) {
+                      console.error('[PaymentScreen] simulateDokuPaid failed', err)
+                      // Continue anyway — UI advance is the dev intent.
+                    }
+                    // Force-advance locally so the dev button works even when
+                    // Realtime is down (sandbox-flake, websocket blocked, etc).
+                    setStatus('paid')
+                    markPaid()
+                    if (sessionIdRef.current) {
+                      await dbUpdateSession(sessionIdRef.current, { status: 'paid' })
+                    }
+                    setTimeout(() => goTo('instructions'), 900)
                   } else {
                     simulatePaid(session.id)
                   }

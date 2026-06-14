@@ -7,7 +7,7 @@ import { appConfig } from '@/config/app-config'
 
 export function HomeScreen() {
   const goTo = useSession((s) => s.goTo)
-  const start = () => goTo(appConfig.payment.enabled ? 'payment' : 'template')
+  const start = () => goTo(appConfig.payment.enabled ? 'payment' : 'instructions')
 
   return (
     <div className="absolute inset-0 flex flex-col">

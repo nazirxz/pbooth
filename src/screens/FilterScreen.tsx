@@ -50,10 +50,7 @@ export function FilterScreen() {
             />
           </div>
 
-          <div className="flex justify-between items-center">
-            <TVButton variant="ghost" size="md" onClick={() => goTo('template')}>
-              ◀ BACK
-            </TVButton>
+          <div className="flex justify-end items-center">
             <TVButton variant="primary" size="lg" onClick={start}>
               START ▶
             </TVButton>

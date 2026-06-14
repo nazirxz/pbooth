@@ -7,6 +7,7 @@ export type ScreenId =
   | 'home'
   | 'settings'
   | 'payment'
+  | 'instructions'
   | 'template'
   | 'filter'
   | 'capture'
@@ -27,7 +28,7 @@ export interface ComposedOutput {
 
 export interface LiveAsset {
   blob: Blob
-  ext: 'gif'
+  ext: 'gif' | 'webm' | 'mp4'
 }
 
 interface SessionState {
@@ -67,7 +68,7 @@ const initial = {
   payment: null,
   paidAt: null as number | null,
   previewStartedAt: null as number | null,
-  template: 'duo-2' as TemplateId,
+  template: 'strip-4' as TemplateId,
   filter: 'none' as FilterId,
   photos: [] as CapturedPhoto[],
   composed: null as ComposedOutput | null,

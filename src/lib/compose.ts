@@ -14,6 +14,8 @@ interface ComposeOpts {
   theme: Theme
   decoration?: {
     borderId: string
+    /** Paper/strip background color. Falls back to theme paperBg when omitted. */
+    stripColor?: string
     stickers: PlacedSticker[]
   }
 }
@@ -45,8 +47,8 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
   canvas.height = layout.paper.h
   const ctx = canvas.getContext('2d')!
 
-  // Paper background
-  ctx.fillStyle = opts.theme.compose.paperBg
+  // Paper background — customer-picked strip color overrides the theme default
+  ctx.fillStyle = opts.decoration?.stripColor ?? opts.theme.compose.paperBg
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   if (opts.theme.compose.noiseAmount > 0) {
     drawNoise(ctx, canvas.width, canvas.height, opts.theme.compose.noiseAmount)
@@ -130,10 +132,8 @@ function drawSectionFooter(
     ctx.strokeRect(qrX, qrY, qrSize, qrSize)
   }
 
-  // "euorna-booth" caption on the right — sized to roughly match the QR
-  // height so both ends of the footer feel visually balanced.
   ctx.fillStyle = theme.compose.footerTextColor
-  ctx.font = `bold 64px "VT323", "Press Start 2P", monospace`
+  ctx.font = `28px Arial, Helvetica, sans-serif`
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
   ctx.fillText('euorna-booth', footer.x + footer.w - 12, footer.y + footer.h / 2)
