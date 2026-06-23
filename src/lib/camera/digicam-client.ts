@@ -48,6 +48,18 @@ export class DigiCamClient {
   }
 
   /**
+   * Read a camera property (e.g. 'autoexposuremode'). Returns the trimmed
+   * value, or null when digiCamControl errors / the property is unknown — so
+   * callers can use it for best-effort diagnostics without try/catch noise.
+   */
+  async getProperty(name: string): Promise<string | null> {
+    const res = await this.fetchSlc('get', name, '')
+    if ('error' in res) return null
+    const value = res.response.trim()
+    return value && value !== '?' ? value : null
+  }
+
+  /**
    * Trigger the shutter. digiCamControl saves the file under its configured
    * session folder; we get the path back via `getLastCaptured`.
    */

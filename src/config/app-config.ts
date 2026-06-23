@@ -10,8 +10,10 @@ export const appConfig = {
   },
   camera: {
     // 'webcam' = laptop/USB webcam (PoC, dev).
-    // 'dslr'   = Canon EOS via digiCamControl HTTP API for tethered capture
-    //            (manual mode + on-body flash), HDMI capture card for live preview.
+    // 'dslr'   = Canon EOS DSLR (e.g. EOS 800D) via digiCamControl HTTP API for
+    //            tethered capture — real mechanical-shutter stills so the pop-up
+    //            flash actually fires and we get full-res JPEGs. HDMI capture card
+    //            is used only for the live preview.
     source: (import.meta.env.VITE_CAMERA_SOURCE ?? 'webcam') as 'webcam' | 'dslr',
     webcam: {
       facingMode: 'user',
@@ -28,11 +30,18 @@ export const appConfig = {
        * Manual shooting parameters applied to the camera before each capture.
        * Strings match digiCamControl's expected property values (camera-dependent).
        * Override per kiosk via env vars when lighting differs.
+       *
+       * FLASH SYNC: with a flash the shutter must stay at/below the body's
+       * X-sync speed (1/200s on the EOS 800D) or a black band appears. Keep
+       * VITE_DCC_SHUTTER <= 1/200 (1/125–1/160 is the safe range).
+       * WHITE BALANCE: default 'Flash' keeps colours consistent since the
+       * pop-up flash is the dominant light source.
        */
       capture: {
         iso: import.meta.env.VITE_DCC_ISO ?? '400',
         shutter: import.meta.env.VITE_DCC_SHUTTER ?? '1/125',
         aperture: import.meta.env.VITE_DCC_APERTURE ?? '5.6',
+        whitebalance: import.meta.env.VITE_DCC_WB ?? 'Flash',
       },
       /**
        * If digiCamControl is unreachable on start (dev machine without rig),

@@ -6,11 +6,14 @@ import type { CameraSource } from './types'
 /**
  * Canon EOS tethered source backed by digiCamControl.
  *
- * COMPATIBILITY: Supported Canon DSLRs (1500D, 90D, 5D…) and R-series
- * mirrorless (R50, R10, R8…). NOT compatible with EOS M-series (M3/M5/M10)
- * — Canon never released a tether SDK for those bodies; for an M3 kiosk
- * use the webcam/HDMI capture path instead. See docs/kiosk-setup-guide.md
- * section L for the M3 → R-series upgrade path.
+ * COMPATIBILITY: Supported Canon DSLRs (EOS 800D, 1500D, 90D, 5D…) and
+ * R-series mirrorless (R50, R10, R8…). NOT compatible with EOS M-series
+ * (M3/M5/M10) — Canon never released a tether SDK for those bodies; for an
+ * M3 kiosk use the webcam/HDMI capture path instead. See docs/kiosk-setup-800d.md
+ * for the EOS 800D rig, and docs/kiosk-setup-guide.md section L for the M3 path.
+ *
+ * EOS 800D NOTE: exposure mode is the physical top dial (EDSDK can't move it)
+ * and the pop-up flash must be raised by hand — see start()'s mode diagnostic.
  *
  * Architecture:
  *  - Live preview comes from an HDMI capture card surfaced as a USB video
@@ -56,6 +59,7 @@ export class DslrSource implements CameraSource {
         )
       }
     } else {
+      await this.warnIfWrongMode()
       await this.applyManualSettings()
     }
 
@@ -92,14 +96,34 @@ export class DslrSource implements CameraSource {
     this.lastCapturedPath = null
   }
 
+  /**
+   * The EOS 800D's exposure mode lives on the physical top dial — EDSDK can't
+   * move it. If the operator left it on Movie/Auto/P our manual ISO/shutter/
+   * aperture won't stick, and in Movie the flash won't fire at all (the exact
+   * "mode video" bug we're fixing). Read it once and warn loudly; never abort —
+   * the operator can turn the dial to M and the next session picks it up.
+   */
+  private async warnIfWrongMode(): Promise<void> {
+    const mode = await this.client.getProperty('autoexposuremode')
+    if (mode === null) return // unreadable on this body — skip the diagnostic
+    if (!/^m(anual)?$/i.test(mode)) {
+      console.warn(
+        `[camera/dslr] exposure mode is "${mode}", not Manual. ` +
+          'Putar mode dial 800D ke M — manual exposure & pop-up flash tidak akan ' +
+          'benar di mode lain. Pastikan juga pop-up flash sudah diangkat.',
+      )
+    }
+  }
+
   private async applyManualSettings(): Promise<void> {
-    const { iso, shutter, aperture } = appConfig.camera.dslr.capture
+    const { iso, shutter, aperture, whitebalance } = appConfig.camera.dslr.capture
     // Each setProperty can fail per-camera (label mismatches between models),
     // so we attempt each independently and warn rather than abort the session.
     for (const [name, value] of [
       ['isonumber', iso],
       ['shutterspeed', shutter],
       ['aperture', aperture],
+      ['whitebalance', whitebalance],
     ] as const) {
       try {
         await this.client.setProperty(name, value)
