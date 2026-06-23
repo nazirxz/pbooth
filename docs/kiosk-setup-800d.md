@@ -83,7 +83,12 @@ foto diambil dengan **shutter mekanik betulan** → **pop-up flash nyala** dan h
 
 ## E. Konfigurasi Pbooth
 
-Edit `.env.production` di folder install Pbooth:
+> ⚠️ **Penting (build-time):** Vite **membakar** semua `VITE_*` ke dalam build saat `npm run build:win`
+> — **bukan** dibaca runtime dari folder install. Jadi env kamera harus di-set **oleh developer sebelum
+> build**, bukan diedit di mini PC. `.exe` yang sudah jadi tidak bisa diubah mode kameranya dengan
+> mengedit file di sebelahnya.
+
+**Developer (sebelum build):** pastikan `.env.production` (atau `.env.production.local`) di root repo berisi:
 
 ```env
 # 800D via digiCamControl tether (manual mode + pop-up flash, full-res)
@@ -95,11 +100,11 @@ VITE_DCC_APERTURE=5.6
 VITE_DCC_WB=Flash
 VITE_DCC_FALLBACK=true      # booth tetap jalan (degrade ke snapshot HDMI tanpa flash)
                             # kalau digiCamControl mati; warning tetap muncul di console
-
-# (lengkapi env Payment / Supabase / R2 sesuai instruksi developer)
 ```
+lalu `npm run build:win` → installer `release/Pbooth-Setup-x.x.x.exe`.
 
-Jalankan Pbooth → **Settings** → pilih video device **"USB Video Device"** (capture card), Save.
+**Di kiosk:** install `.exe` → buka Pbooth → **Settings** → pilih video device **"USB Video Device"**
+(capture card) → Save.
 
 ---
 
