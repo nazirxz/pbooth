@@ -14,13 +14,11 @@ export interface PlacedSticker {
 }
 
 interface DecorationState {
-  borderId: string           // one of BORDERS ids
   /** Paper/strip background color (hex). Customer-picked. */
   stripColor: string
   stickers: PlacedSticker[]
   selectedStickerId: string | null
 
-  setBorder: (id: string) => void
   setStripColor: (color: string) => void
   addSticker: (assetId: string, x?: number, y?: number) => void
   moveSticker: (id: string, x: number, y: number) => void
@@ -28,7 +26,7 @@ interface DecorationState {
   removeSticker: (id: string) => void
   selectSticker: (id: string | null) => void
   clearStickers: () => void
-  reset: (borderId?: string) => void
+  reset: () => void
 }
 
 let counter = 0
@@ -40,12 +38,9 @@ function nextStickerId() {
 export const DEFAULT_STRIP_COLOR = '#224a34'
 
 export const useDecoration = create<DecorationState>((set) => ({
-  borderId: 'classic-black',
   stripColor: DEFAULT_STRIP_COLOR,
   stickers: [],
   selectedStickerId: null,
-
-  setBorder: (borderId) => set({ borderId }),
 
   setStripColor: (stripColor) => set({ stripColor }),
 
@@ -84,9 +79,8 @@ export const useDecoration = create<DecorationState>((set) => ({
 
   clearStickers: () => set({ stickers: [], selectedStickerId: null }),
 
-  reset: (borderId = 'classic-black') =>
+  reset: () =>
     set({
-      borderId,
       stripColor: DEFAULT_STRIP_COLOR,
       stickers: [],
       selectedStickerId: null,
