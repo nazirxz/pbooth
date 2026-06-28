@@ -165,7 +165,10 @@ export function PreviewScreen() {
     setPrintState('printing')
     setPrintError(null)
     try {
-      await window.pbooth.print(composed.dataUrl)
+      await window.pbooth.print(composed.dataUrl, {
+        deviceName: appConfig.printer.deviceName,
+        silent: appConfig.printer.silent,
+      })
       setPrintState('success')
       setTimeout(() => setPrintState('idle'), 3000)
     } catch (err) {

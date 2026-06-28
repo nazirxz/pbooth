@@ -66,9 +66,27 @@ app.on('will-quit', () => globalShortcut.unregisterAll())
 ipcMain.handle('app:quit', () => app.quit())
 ipcMain.handle('app:version', () => app.getVersion())
 
-ipcMain.handle('printer:print', async (_event, dataUrl: string) => {
+ipcMain.handle(
+  'printer:print',
+  async (_event, dataUrl: string, opts?: { deviceName?: string; silent?: boolean }) => {
   const win = BrowserWindow.getFocusedWindow()
   if (!win) throw new Error('No focused window for print')
+
+  // Resolve the wanted printer by case-insensitive substring match against the
+  // installed printers, so a config of "DS-RX1" matches "DNP DS-RX1". Empty
+  // string => let the OS use its default printer.
+  const wanted = (opts?.deviceName ?? '').trim()
+  let deviceName = wanted
+  if (wanted) {
+    try {
+      const printers = await win.webContents.getPrintersAsync()
+      const match = printers.find((p) => p.name.toLowerCase().includes(wanted.toLowerCase()))
+      deviceName = match ? match.name : wanted
+    } catch {
+      deviceName = wanted
+    }
+  }
+  const silent = opts?.silent ?? true
 
   return new Promise<void>((resolve, reject) => {
     const printHTML = `
@@ -95,8 +113,8 @@ ipcMain.handle('printer:print', async (_event, dataUrl: string) => {
     printWin.webContents.once('did-finish-load', () => {
       printWin.webContents.print(
         {
-          silent: true,
-          deviceName: 'DNP',
+          silent,
+          deviceName,
           printBackground: true,
           margins: { marginType: 'none' },
         },
@@ -111,4 +129,5 @@ ipcMain.handle('printer:print', async (_event, dataUrl: string) => {
       )
     })
   })
-})
+  },
+)

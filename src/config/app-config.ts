@@ -114,10 +114,11 @@ export const appConfig = {
   },
   printer: {
     enabled: true,
-    // Device name as it appears in Windows printer list. Leave empty to use
-    // the system default printer. DNP printers typically show as "DNP DS620"
-    // or similar — check Control Panel → Devices and Printers for exact name.
-    deviceName: 'DNP',
+    // Substring of the printer's name in the Windows printer list. The main
+    // process matches it case-insensitively against installed printers, so
+    // "DS-RX1" also matches "DNP DS-RX1". Leave empty to use the system
+    // default printer. Override per kiosk with VITE_PRINTER_NAME.
+    deviceName: import.meta.env.VITE_PRINTER_NAME ?? 'DS-RX1',
     // Silent print (no OS dialog). Set false for testing with print preview.
     silent: true,
   },

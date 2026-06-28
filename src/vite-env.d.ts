@@ -16,7 +16,7 @@ interface Window {
   pbooth?: {
     quit: () => Promise<void>
     version: () => Promise<string>
-    print: (dataUrl: string) => Promise<void>
+    print: (dataUrl: string, opts?: { deviceName?: string; silent?: boolean }) => Promise<void>
   }
 }
 
