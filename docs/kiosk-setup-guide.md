@@ -2,6 +2,8 @@
 
 Panduan lengkap pemasangan kiosk Pbooth dari nol untuk **Canon EOS M3** via HDMI capture (manual photo mode, tanpa flash). Section akhir membahas path upgrade ke setup ber-flash.
 
+> 📸 **Pakai Canon EOS 800D (atau DSLR/R-series lain)?** Lihat [`kiosk-setup-800d.md`](kiosk-setup-800d.md) — rig tether digiCamControl dengan **manual mode + pop-up flash + foto full-res**. Panduan di bawah ini khusus EOS M3 (HDMI grab, tanpa flash).
+
 > **Estimasi waktu**: 60–90 menit untuk operator yang sudah biasa, 2–3 jam pertama kali.
 
 > ⚠️ **Catatan kamera**: Canon EOS M3 tidak didukung software tether (digiCamControl, gphoto2 tidak reliable). Setup ini pakai **HDMI capture** — kamera streaming live view ke PC seperti webcam. Cukup untuk kiosk asal lighting venue konsisten.

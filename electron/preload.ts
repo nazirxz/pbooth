@@ -3,7 +3,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 contextBridge.exposeInMainWorld('pbooth', {
   quit: () => ipcRenderer.invoke('app:quit'),
   version: () => ipcRenderer.invoke('app:version'),
-  print: (dataUrl: string) => ipcRenderer.invoke('printer:print', dataUrl),
+  print: (dataUrl: string, opts?: { deviceName?: string; silent?: boolean }) =>
+    ipcRenderer.invoke('printer:print', dataUrl, opts),
 })
 
 declare global {
@@ -11,7 +12,7 @@ declare global {
     pbooth: {
       quit: () => Promise<void>
       version: () => Promise<string>
-      print: (dataUrl: string) => Promise<void>
+      print: (dataUrl: string, opts?: { deviceName?: string; silent?: boolean }) => Promise<void>
     }
   }
 }

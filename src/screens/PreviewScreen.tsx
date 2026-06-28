@@ -33,7 +33,6 @@ export function PreviewScreen() {
   const reset = useSession((s) => s.reset)
   const startPreviewCountdown = useSession((s) => s.startPreviewCountdown)
   const theme = useTheme((s) => s.theme)
-  const borderId = useDecoration((s) => s.borderId)
   const stripColor = useDecoration((s) => s.stripColor)
   const placedStickers = useDecoration((s) => s.stickers)
 
@@ -87,7 +86,7 @@ export function PreviewScreen() {
           template,
           filterId: filter,
           theme,
-          decoration: { borderId, stripColor, stickers: placedStickers },
+          decoration: { stripColor, stickers: placedStickers },
         })
         if (cancelled) return
         const dataUrl = await blobToDataUrl(blob)
@@ -159,14 +158,17 @@ export function PreviewScreen() {
     return () => {
       cancelled = true
     }
-  }, [composed, photos, template, filter, sessionId, setComposed, theme, borderId, stripColor, placedStickers, liveAsset, setLiveAsset])
+  }, [composed, photos, template, filter, sessionId, setComposed, theme, stripColor, placedStickers, liveAsset, setLiveAsset])
 
   const handlePrint = async () => {
     if (!composed || !window.pbooth?.print) return
     setPrintState('printing')
     setPrintError(null)
     try {
-      await window.pbooth.print(composed.dataUrl)
+      await window.pbooth.print(composed.dataUrl, {
+        deviceName: appConfig.printer.deviceName,
+        silent: appConfig.printer.silent,
+      })
       setPrintState('success')
       setTimeout(() => setPrintState('idle'), 3000)
     } catch (err) {

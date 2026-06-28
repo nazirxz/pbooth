@@ -1,7 +1,6 @@
 import { type TemplateId } from '@/config/app-config'
 import type { CapturedPhoto } from '@/state/session-store'
 import type { PlacedSticker } from '@/state/decoration-store'
-import { getBorder } from '@/lib/borders'
 import { getSticker } from '@/lib/stickers'
 import { computePaperLayout, type PaperLayout, type Rect } from '@/lib/strip-layout'
 import type { Theme } from '@/themes'
@@ -13,7 +12,6 @@ interface ComposeOpts {
   filterId: string
   theme: Theme
   decoration?: {
-    borderId: string
     /** Paper/strip background color. Falls back to theme paperBg when omitted. */
     stripColor?: string
     stickers: PlacedSticker[]
@@ -104,12 +102,6 @@ function drawSectionFrames(
     drawCover(ctx, img, f.x, f.y, f.w, f.h)
   }
   ctx.filter = 'none'
-
-  const borderId = opts.decoration?.borderId ?? 'classic-black'
-  const border = getBorder(borderId)
-  for (const f of section.frames) {
-    border.renderCanvas(ctx, { x: f.x, y: f.y, w: f.w, h: f.h, themeId: opts.theme.id })
-  }
 }
 
 function drawSectionFooter(

@@ -5,12 +5,11 @@ import { TVButton } from '@/components/TVButton'
 import { useSession, type CapturedPhoto } from '@/state/session-store'
 import { useDecoration, type PlacedSticker } from '@/state/decoration-store'
 import { useTheme } from '@/state/theme-store'
-import { BORDERS, bordersForTheme, getBorder } from '@/lib/borders'
 import { STICKERS, getSticker } from '@/lib/stickers'
 import { computePaperLayout, type PaperLayout } from '@/lib/strip-layout'
 import { buildGifFromPhotos } from '@/lib/gif-encoder'
 
-type Step = 'sticker' | 'border'
+type Step = 'sticker' | 'color'
 
 export function DecorateScreen() {
   const goTo = useSession((s) => s.goTo)
@@ -21,11 +20,9 @@ export function DecorateScreen() {
   const setLiveAsset = useSession((s) => s.setLiveAsset)
   const theme = useTheme((s) => s.theme)
 
-  const borderId = useDecoration((s) => s.borderId)
   const stripColor = useDecoration((s) => s.stripColor)
   const stickers = useDecoration((s) => s.stickers)
   const selectedId = useDecoration((s) => s.selectedStickerId)
-  const setBorder = useDecoration((s) => s.setBorder)
   const setStripColor = useDecoration((s) => s.setStripColor)
   const addSticker = useDecoration((s) => s.addSticker)
   const moveSticker = useDecoration((s) => s.moveSticker)
@@ -38,7 +35,7 @@ export function DecorateScreen() {
 
   // Reset decoration for a fresh session.
   useEffect(() => {
-    resetDecoration('classic-black')
+    resetDecoration()
   }, [resetDecoration])
 
   // Build the live-photo GIF in the background while the user picks a border /
@@ -70,7 +67,6 @@ export function DecorateScreen() {
   }, [liveAsset, photos, filter, theme, setLiveAsset])
 
   const layout = useMemo(() => computePaperLayout(template), [template])
-  const availableBorders = useMemo(() => bordersForTheme(theme.id), [theme.id])
 
   return (
     <div className="absolute inset-0 grid grid-rows-[auto_1fr]">
@@ -81,9 +77,7 @@ export function DecorateScreen() {
           photos={photos}
           filterId={filter}
           layout={layout}
-          borderId={borderId}
           stripColor={stripColor}
-          themeId={theme.id}
           stickers={stickers}
           selectedId={selectedId}
           onStickerMove={moveSticker}
@@ -102,9 +96,9 @@ export function DecorateScreen() {
             />
             <StepBadge
               n={2}
-              label="BORDER"
-              active={step === 'border'}
-              onClick={() => setStep('border')}
+              label="STRIP COLOR"
+              active={step === 'color'}
+              onClick={() => setStep('color')}
             />
           </div>
 
@@ -112,14 +106,7 @@ export function DecorateScreen() {
             {step === 'sticker' ? (
               <StickerGrid onPick={(a) => addSticker(a)} />
             ) : (
-              <div className="flex flex-col gap-4">
-                <BorderGrid
-                  borders={availableBorders}
-                  selectedId={borderId}
-                  onPick={setBorder}
-                />
-                <StripColorPicker color={stripColor} onChange={setStripColor} />
-              </div>
+              <StripColorPicker color={stripColor} onChange={setStripColor} />
             )}
           </div>
 
@@ -129,7 +116,7 @@ export function DecorateScreen() {
                 <TVButton variant="ghost" size="md" onClick={() => goTo('preview')}>
                   ⏭ SKIP
                 </TVButton>
-                <TVButton variant="primary" size="lg" onClick={() => setStep('border')}>
+                <TVButton variant="primary" size="lg" onClick={() => setStep('color')}>
                   NEXT ▶
                 </TVButton>
               </>
@@ -192,9 +179,7 @@ function StripStage(props: {
   photos: CapturedPhoto[]
   filterId: string
   layout: PaperLayout
-  borderId: string
   stripColor: string
-  themeId: string
   stickers: PlacedSticker[]
   selectedId: string | null
   onStickerMove: (id: string, x: number, y: number) => void
@@ -206,9 +191,7 @@ function StripStage(props: {
     photos,
     filterId,
     layout,
-    borderId,
     stripColor,
-    themeId,
     stickers,
     selectedId,
     onStickerMove,
@@ -247,14 +230,8 @@ function StripStage(props: {
       ctx.filter = 'none'
     }
 
-    // Redraw border + cut-line after a tick so they sit on top
+    // Redraw the cut-line after a tick so it sits on top of the photos
     requestAnimationFrame(() => {
-      const border = getBorder(borderId)
-      for (const section of layout.sections) {
-        for (const f of section.frames) {
-          border.renderCanvas(ctx, { ...f, themeId })
-        }
-      }
       if (layout.cutLine) {
         ctx.save()
         ctx.strokeStyle = 'rgba(0,0,0,0.2)'
@@ -267,7 +244,7 @@ function StripStage(props: {
         ctx.restore()
       }
     })
-  }, [photos, filterId, borderId, stripColor, layout, themeId])
+  }, [photos, filterId, stripColor, layout])
 
   const handleStagePointerDown = (e: React.PointerEvent) => {
     // Tap on stage (outside a sticker) clears selection
@@ -456,39 +433,6 @@ function clamp01(v: number) {
 }
 
 /* ─────────── Picker grids ─────────── */
-
-function BorderGrid({
-  borders,
-  selectedId,
-  onPick,
-}: {
-  borders: typeof BORDERS
-  selectedId: string
-  onPick: (id: string) => void
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      {borders.map((b) => (
-        <button
-          key={b.id}
-          onClick={() => onPick(b.id)}
-          className={clsx(
-            'touch-press p-3 border-2 rounded-xl text-left font-crt',
-            selectedId === b.id
-              ? 'border-crt-phosphor bg-crt-phosphor/15'
-              : 'border-crt-cream/30 bg-black/40',
-          )}
-        >
-          <div
-            className="h-14 rounded-md mb-2"
-            style={{ background: b.swatch || '#1a1412' }}
-          />
-          <div className="text-lg tracking-widest text-crt-cream">{b.name}</div>
-        </button>
-      ))}
-    </div>
-  )
-}
 
 const STRIP_COLOR_PRESETS = ['#224a34', '#a9d099', '#000000', '#ffffff']
 
