@@ -46,7 +46,8 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
   const ctx = canvas.getContext('2d')!
 
   // Paper background — customer-picked strip color overrides the theme default
-  ctx.fillStyle = opts.decoration?.stripColor ?? opts.theme.compose.paperBg
+  const paperBg = opts.decoration?.stripColor ?? opts.theme.compose.paperBg
+  ctx.fillStyle = paperBg
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   if (opts.theme.compose.noiseAmount > 0) {
     drawNoise(ctx, canvas.width, canvas.height, opts.theme.compose.noiseAmount)
@@ -57,7 +58,7 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
   // Draw each strip section
   for (const section of layout.sections) {
     drawSectionFrames(ctx, section, imgs, opts)
-    drawSectionFooter(ctx, section.footer, qr, opts.theme)
+    drawSectionFooter(ctx, section.footer, qr, opts.theme, paperBg)
   }
 
   // Cut line for 2-up strips
@@ -109,28 +110,61 @@ function drawSectionFooter(
   footer: Rect,
   qr: HTMLImageElement | null,
   theme: Theme,
+  paperBg: string,
 ) {
   ctx.save()
 
-  // QR code on the bottom-left
+  // Footer ink has to contrast the customer-picked strip color — the dark
+  // theme text vanishes on a dark strip. Use light ink on dark paper.
+  const dark = isDarkColor(paperBg)
+  const ink = dark ? '#f5e6c8' : theme.compose.footerTextColor
+
+  // QR code on the bottom-left. On a dark strip, sit it on a white quiet-zone
+  // card so it stays scannable.
   const qrSize = Math.min(footer.h - 16, 110)
   const qrX = footer.x + 8
   const qrY = footer.y + (footer.h - qrSize) / 2
   if (qr) {
+    if (dark) {
+      const pad = 6
+      ctx.fillStyle = '#ffffff'
+      roundRect(ctx, qrX - pad, qrY - pad, qrSize + pad * 2, qrSize + pad * 2, 6)
+      ctx.fill()
+    }
     ctx.drawImage(qr, qrX, qrY, qrSize, qrSize)
   } else {
-    ctx.strokeStyle = theme.compose.footerTextColor
+    ctx.strokeStyle = ink
     ctx.lineWidth = 2
     ctx.strokeRect(qrX, qrY, qrSize, qrSize)
   }
 
-  ctx.fillStyle = theme.compose.footerTextColor
+  ctx.fillStyle = ink
   ctx.font = `28px Arial, Helvetica, sans-serif`
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
   ctx.fillText('euorna-booth', footer.x + footer.w - 12, footer.y + footer.h / 2)
 
   ctx.restore()
+}
+
+/** Perceived-luminance check (0–255 scale); below mid reads as a dark color. */
+function isDarkColor(hex: string): boolean {
+  const c = hex.replace('#', '')
+  const n = c.length === 3 ? c.replace(/(.)/g, '$1$1') : c
+  const r = parseInt(n.slice(0, 2), 16)
+  const g = parseInt(n.slice(2, 4), 16)
+  const b = parseInt(n.slice(4, 6), 16)
+  return 0.299 * r + 0.587 * g + 0.114 * b < 140
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
 }
 
 function loadImage(photo: CapturedPhoto): Promise<HTMLImageElement> {
