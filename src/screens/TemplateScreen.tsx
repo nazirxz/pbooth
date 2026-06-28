@@ -63,7 +63,7 @@ function TemplateThumb({ id }: { id: string }) {
   const common = 'border-2 border-crt-cream/60 grid gap-1 p-1 bg-black/60'
   if (id === 'strip-4')
     return (
-      <div className={clsx(common, 'grid-rows-4 w-20 h-40')}>
+      <div className={clsx(common, 'grid-cols-2 grid-rows-2 w-28 h-40')}>
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className="bg-crt-cream/20 rounded-sm" />
         ))}
