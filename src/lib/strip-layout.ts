@@ -7,9 +7,9 @@ import { appConfig, type TemplateId } from '@/config/app-config'
  * 4R physical size  : 10.2 × 15.2 cm
  * 300 DPI pixel size: 1200 × 1800 (portrait)
  *
- * All templates render as a single full-width strip on the 4R sheet —
- * one column of N photos with a footer. drawCover crops the source webcam
- * image to fit each frame, so face crop will tighten as N grows.
+ * Templates render either as a single full-width strip (one column of N
+ * photos) or as a cols×rows grid — both on the 4R sheet with a footer band.
+ * drawCover crops the source image to fit each frame.
  */
 
 export interface Rect {
@@ -40,7 +40,43 @@ const PAPER_PORTRAIT = { w: 1200, h: 1800 }
 
 export function computePaperLayout(templateId: TemplateId): PaperLayout {
   const tmpl = appConfig.templates.find((t) => t.id === templateId)!
-  return portraitStripLayout(tmpl.frames)
+  return tmpl.layout === 'grid' ? portraitGridLayout(2, 2) : portraitStripLayout(tmpl.frames)
+}
+
+/**
+ * cols×rows grid on the 4R sheet (e.g. 2×2 for 4 photos), sharing the same
+ * footer band as the strip layout. Frames fill row-major (top-left →
+ * bottom-right) so the sequential shots land in reading order. The strip
+ * color shows through the OUTER margin + GAPs, framing each photo.
+ */
+function portraitGridLayout(cols: number, rows: number): PaperLayout {
+  const { w: PW, h: PH } = PAPER_PORTRAIT
+  const OUTER = 60
+  const GAP = 20
+  const FOOTER_H = 130
+
+  const frameW = (PW - OUTER * 2 - GAP * (cols - 1)) / cols
+  const frameH = (PH - OUTER * 2 - FOOTER_H - GAP * (rows - 1)) / rows
+
+  const frames: Rect[] = []
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      frames.push({
+        x: OUTER + c * (frameW + GAP),
+        y: OUTER + r * (frameH + GAP),
+        w: frameW,
+        h: frameH,
+      })
+    }
+  }
+
+  const section: StripSection = {
+    bounds: { x: 0, y: 0, w: PW, h: PH },
+    frames,
+    footer: { x: OUTER, y: PH - OUTER - FOOTER_H, w: PW - OUTER * 2, h: FOOTER_H },
+  }
+
+  return { paper: PAPER_PORTRAIT, orientation: 'portrait', sections: [section] }
 }
 
 function portraitStripLayout(frameCount: number): PaperLayout {
