@@ -94,9 +94,9 @@ ipcMain.handle(
       <html>
       <head>
         <style>
-          * { margin: 0; padding: 0; }
-          body { display: flex; justify-content: center; align-items: center; }
-          img { max-width: 100%; height: auto; }
+          @page { size: 4in 6in; margin: 0; }
+          html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
+          img { display: block; width: 100%; height: 100%; object-fit: cover; }
         </style>
       </head>
       <body><img src="${dataUrl}" /></body>
@@ -117,6 +117,12 @@ ipcMain.handle(
           deviceName,
           printBackground: true,
           margins: { marginType: 'none' },
+          landscape: false,
+          // 4R = 4×6 inch portrait, in microns (1 in = 25 400 µm). The composed
+          // strip is 1200×1800 (2:3), so it fills the sheet exactly. Without
+          // this Electron uses the driver default (often 6×4 landscape) and the
+          // portrait image overflows onto a second sheet.
+          pageSize: { width: 101_600, height: 152_400 },
         },
         (success, failureReason) => {
           printWin.close()
