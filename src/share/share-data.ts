@@ -41,10 +41,12 @@ export async function fetchSharedSession(sessionId: string): Promise<SharedSessi
   if (photoErr) throw new Error('PHOTOS_FETCH_FAILED')
 
   const photoEntries: SharedPhoto[] = []
+  // Sign raw-frame URLs with the configured backend. (The old heuristic
+  // `!path.includes('supabase')` was always true for Supabase paths like
+  // `<session>/frame_0.jpg`, so every raw photo got routed to R2 signing and
+  // silently dropped — the section disappeared on the web.)
+  const isR2 = appConfig.storage.backend === 'r2'
   for (const p of photos ?? []) {
-    // Detect storage backend from path
-    const isR2 = !p.storage_path.includes('supabase')
-
     if (isR2) {
       // R2 storage - use R2 presigned URL
       const signedUrl = await getR2SignedUrl(p.storage_path, SIGNED_URL_TTL)

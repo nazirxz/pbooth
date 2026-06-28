@@ -57,7 +57,12 @@ export const appConfig = {
     // Number of shots per session is driven by the selected template's `frames`,
     // not a global config — so picking TRIO captures 3, DUO captures 2, etc.
     countdownSec: 5,
-    delayBetweenFramesMs: 800,
+    // How long to show the just-captured photo as a review popup before the
+    // next shot — doubles as confirmation feedback and hides the tether
+    // download wait behind something the customer actually wants to see.
+    reviewMs: 1_500,
+    // Brief breath after the review before the next countdown starts.
+    delayBetweenFramesMs: 250,
   },
   payment: {
     enabled: true,

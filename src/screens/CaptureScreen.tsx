@@ -29,6 +29,8 @@ export function CaptureScreen() {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [frameIdx, setFrameIdx] = useState(0)
   const [flash, setFlash] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [review, setReview] = useState<string | null>(null)
 
   useEffect(() => {
     clearPhotos()
@@ -55,10 +57,22 @@ export function CaptureScreen() {
         setFlash(false)
 
         if (!videoRef.current) continue
+        // Show a "saving" state while the tethered JPEG transfers over USB —
+        // otherwise the screen just freezes during the unavoidable wait.
+        setSaving(true)
         const blob = await src.capture(videoRef.current)
         const dataUrl = await blobToDataUrl(blob)
+        setSaving(false)
+        if (cancelled) return
         addPhoto({ index: i, blob, dataUrl })
         if (sessionId) void uploadPhoto(sessionId, i, blob)
+
+        // Review popup: show the shot before the next one. Confirmation for the
+        // customer, and it absorbs the inter-frame gap behind something useful.
+        setReview(dataUrl)
+        await wait(appConfig.capture.reviewMs)
+        if (cancelled) return
+        setReview(null)
         await wait(appConfig.capture.delayBetweenFramesMs)
       }
 
@@ -121,6 +135,25 @@ export function CaptureScreen() {
           </AnimatePresence>
 
           {flash && <div className="absolute inset-0 bg-white animate-pulse" />}
+
+          {saving && (
+            <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+              <div className="font-crt text-3xl text-crt-amber tracking-widest animate-pulse">
+                SAVING…
+              </div>
+            </div>
+          )}
+
+          {review && (
+            <div className="absolute inset-0 bg-black/85 flex items-center justify-center p-6">
+              <div className="relative max-h-full overflow-hidden rounded-xl border-4 border-crt-phosphor shadow-[0_0_40px_rgba(57,255,20,0.4)]">
+                <img src={review} alt="" className="block max-h-[68vh] w-auto object-contain" />
+                <div className="absolute inset-x-0 bottom-0 bg-black/75 py-2 text-center font-crt text-2xl tracking-widest text-crt-phosphor">
+                  SHOT {frameIdx + 1}/{frameCount}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-3 items-stretch min-h-0 overflow-y-auto">
