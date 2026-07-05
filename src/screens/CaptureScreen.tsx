@@ -7,7 +7,6 @@ import { appConfig } from '@/config/app-config'
 import { useSession } from '@/state/session-store'
 import { useTheme } from '@/state/theme-store'
 import { createCameraSource } from '@/lib/camera'
-import { uploadPhoto } from '@/lib/storage'
 import { buildVideoFromPhotos } from '@/lib/video-encoder'
 
 export function CaptureScreen() {
@@ -61,11 +60,10 @@ export function CaptureScreen() {
         // otherwise the screen just freezes during the unavoidable wait.
         setSaving(true)
         const blob = await src.capture(videoRef.current)
-        const dataUrl = await blobToDataUrl(blob)
+        const dataUrl = URL.createObjectURL(blob)
         setSaving(false)
         if (cancelled) return
         addPhoto({ index: i, blob, dataUrl })
-        if (sessionId) void uploadPhoto(sessionId, i, blob)
 
         // Review popup: show the shot before the next one. Confirmation for the
         // customer, and it absorbs the inter-frame gap behind something useful.
@@ -192,13 +190,4 @@ export function CaptureScreen() {
 
 function wait(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
-}
-
-function blobToDataUrl(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => resolve(r.result as string)
-    r.onerror = reject
-    r.readAsDataURL(blob)
-  })
 }
