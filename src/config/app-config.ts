@@ -83,7 +83,7 @@ export const appConfig = {
     // so this resolves to false and the button never renders. Belt-and-
     // suspenders: the dev-simulate-paid edge function is also locked when
     // DOKU_ENV=production server-side.
-    devSkipButton: import.meta.env.DEV,
+    devSkipButton: import.meta.env.DEV || import.meta.env.VITE_DEV_SKIP_BUTTON === 'true',
     mockAutoResolveMs: 3_000,
     doku: {
       // Optional override for the create-doku-payment edge function URL.

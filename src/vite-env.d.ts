@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_SHARE_BASE_URL?: string
   readonly VITE_PAYMENT_PROVIDER?: 'mock' | 'doku'
   readonly VITE_DOKU_CREATE_URL?: string
+  readonly VITE_DEV_SKIP_BUTTON?: string
 }
 
 interface ImportMeta {
