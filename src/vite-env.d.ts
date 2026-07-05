@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_PAYMENT_PROVIDER?: 'mock' | 'doku'
   readonly VITE_DOKU_CREATE_URL?: string
   readonly VITE_DEV_SKIP_BUTTON?: string
+  readonly VITE_CAPTURE_COUNTDOWN_SEC?: string
+  readonly VITE_PRINTER_SILENT?: string
 }
 
 interface ImportMeta {
