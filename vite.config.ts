@@ -33,6 +33,9 @@ export default defineConfig({
     strictPort: true,
     host: isWeb ? true : 'localhost',
   },
+  optimizeDeps: {
+    entries: ['index.html'],
+  },
   build: {
     outDir: isWeb ? 'dist-web' : 'dist',
     emptyOutDir: true,

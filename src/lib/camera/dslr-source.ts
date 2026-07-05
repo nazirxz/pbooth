@@ -44,9 +44,15 @@ export class DslrSource implements CameraSource {
   async start(): Promise<MediaStream> {
     // Preview track first — even if digiCamControl is down we want pose
     // feedback so the operator can diagnose the rig.
+    console.info('[camera/dslr] starting preview stream')
     const stream = await this.preview.start()
+    console.info('[camera/dslr] preview stream ready', describeStream(stream))
 
     this.apiReady = await this.client.ping()
+    console.info('[camera/dslr] digiCamControl ping result', {
+      apiUrl: appConfig.camera.dslr.apiUrl,
+      apiReady: this.apiReady,
+    })
     if (!this.apiReady) {
       if (appConfig.camera.dslr.fallbackToWebcam) {
         console.warn(
@@ -69,26 +75,54 @@ export class DslrSource implements CameraSource {
     // Capture device may have changed since last session — refresh the
     // baseline so we can detect the next shutter's file even on first shot.
     this.lastCapturedPath = await this.readLastCaptured()
+    console.info('[camera/dslr] last captured baseline', {
+      lastCapturedPath: this.lastCapturedPath,
+    })
 
     return stream
   }
 
   async capture(videoEl: HTMLVideoElement): Promise<Blob> {
-    if (!this.apiReady) return this.preview.capture(videoEl)
+    if (!this.apiReady) {
+      console.warn('[camera/dslr] API unavailable, using preview snapshot fallback')
+      return this.preview.capture(videoEl)
+    }
 
+    const previousPath = this.lastCapturedPath
+    console.info('[camera/dslr] tether capture start', {
+      previousPath,
+      timeoutMs: appConfig.camera.dslr.captureTimeoutMs,
+    })
     try {
       await this.client.capture()
+      console.info('[camera/dslr] shutter command accepted')
       const path = await this.client.waitForNewCapture(
-        this.lastCapturedPath,
+        previousPath,
         appConfig.camera.dslr.captureTimeoutMs,
       )
       this.lastCapturedPath = path
-      return await this.client.downloadImage(path)
+      const blob = await this.client.downloadImage(path)
+      console.info('[camera/dslr] tether capture complete', {
+        path,
+        previousPath,
+        blobBytes: blob.size,
+        blobType: blob.type || '(unknown)',
+      })
+      return blob
     } catch (e) {
       if (appConfig.camera.dslr.fallbackToWebcam) {
-        console.warn('[camera/dslr] tether capture failed, falling back to preview snapshot', e)
+        console.warn('[camera/dslr] tether capture failed, falling back to preview snapshot', {
+          previousPath,
+          lastCapturedPath: this.lastCapturedPath,
+          error: e instanceof Error ? e.message : String(e),
+        }, e)
         return this.preview.capture(videoEl)
       }
+      console.error('[camera/dslr] tether capture failed and fallback is disabled', {
+        previousPath,
+        lastCapturedPath: this.lastCapturedPath,
+        error: e instanceof Error ? e.message : String(e),
+      }, e)
       throw e
     }
   }
@@ -139,13 +173,22 @@ export class DslrSource implements CameraSource {
   /** Best-effort snapshot of digiCamControl's "last captured" path. */
   private async readLastCaptured(): Promise<string | null> {
     try {
-      // Reusing waitForNewCapture with a tiny timeout would throw — we
-      // just want the current value, so peek by passing an unmatchable
-      // sentinel. Easier: do a single fetch via a private helper.
-      // For simplicity, swallow the throw and treat as no baseline.
-      return await this.client.waitForNewCapture(null, 250)
-    } catch {
+      return await this.client.getLastCaptured()
+    } catch (e) {
+      console.warn('[camera/dslr] could not read last captured baseline', e)
       return null
     }
   }
+}
+
+function describeStream(stream: MediaStream | null) {
+  if (!stream) return null
+  return stream.getTracks().map((track) => ({
+    kind: track.kind,
+    label: track.label,
+    readyState: track.readyState,
+    enabled: track.enabled,
+    muted: track.muted,
+    settings: track.getSettings(),
+  }))
 }
