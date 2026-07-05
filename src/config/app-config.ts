@@ -56,7 +56,7 @@ export const appConfig = {
   capture: {
     // Number of shots per session is driven by the selected template's `frames`,
     // not a global config — so picking TRIO captures 3, DUO captures 2, etc.
-    countdownSec: 5,
+    countdownSec: parseInt(import.meta.env.VITE_CAPTURE_COUNTDOWN_SEC ?? '5', 10),
     // How long to show the just-captured photo as a review popup before the
     // next shot — doubles as confirmation feedback and hides the tether
     // download wait behind something the customer actually wants to see.
@@ -125,7 +125,7 @@ export const appConfig = {
     // default printer. Override per kiosk with VITE_PRINTER_NAME.
     deviceName: import.meta.env.VITE_PRINTER_NAME ?? 'DS-RX1',
     // Silent print (no OS dialog). Set false for testing with print preview.
-    silent: true,
+    silent: import.meta.env.VITE_PRINTER_SILENT !== 'false',
     // Print orientation (landscape vs portrait).
     landscape: import.meta.env.VITE_PRINTER_LANDSCAPE === 'true',
     // Print rotation in degrees (0, 90, 180, 270).
