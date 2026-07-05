@@ -29,6 +29,7 @@ interface Window {
         rotation?: number
       }
     ) => Promise<void>
+    getPrinters: () => Promise<string[]>
   }
 }
 

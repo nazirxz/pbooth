@@ -51,6 +51,19 @@ export function PreviewScreen() {
     return () => clearTimeout(t)
   }, [startPreviewCountdown, reset])
 
+  // List installed printers to the console for easier debug
+  useEffect(() => {
+    if (window.pbooth?.getPrinters) {
+      window.pbooth.getPrinters()
+        .then((printers) => {
+          console.log('[printer] Installed printers on this machine:', printers)
+        })
+        .catch((e) => {
+          console.warn('[printer] Failed to fetch printers:', e)
+        })
+    }
+  }, [])
+
   // Generate the QR as soon as we have a sessionId — independent of upload
   // status. The share page works the moment the row + photos hit Supabase,
   // and re-fetches itself if the user reloads, so customers can scan early.
