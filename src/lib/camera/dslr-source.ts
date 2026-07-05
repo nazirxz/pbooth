@@ -33,7 +33,10 @@ import type { CameraSource } from './types'
 export class DslrSource implements CameraSource {
   readonly name = 'dslr'
 
-  private client = new DigiCamClient(appConfig.camera.dslr.apiUrl)
+  private client = new DigiCamClient(
+    appConfig.camera.dslr.apiUrl,
+    appConfig.camera.dslr.captureTimeoutMs
+  )
   private preview = new WebcamSource()
   private apiReady = false
   private lastCapturedPath: string | null = null
