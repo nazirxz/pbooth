@@ -172,3 +172,16 @@ ipcMain.handle(
     })
   },
 )
+
+ipcMain.handle('printer:list', async () => {
+  const win = BrowserWindow.getFocusedWindow()
+  if (!win) return []
+  try {
+    const printers = await win.webContents.getPrintersAsync()
+    return printers.map((p) => p.name)
+  } catch (e) {
+    console.error('Failed to get printers:', e)
+    return []
+  }
+})
+

@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('pbooth', {
       rotation?: number
     }
   ) => ipcRenderer.invoke('printer:print', dataUrl, opts),
+  getPrinters: () => ipcRenderer.invoke('printer:list'),
 })
 
 declare global {
@@ -28,6 +29,7 @@ declare global {
           rotation?: number
         }
       ) => Promise<void>
+      getPrinters: () => Promise<string[]>
     }
   }
 }
