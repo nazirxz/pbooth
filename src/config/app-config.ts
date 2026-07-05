@@ -126,6 +126,10 @@ export const appConfig = {
     deviceName: import.meta.env.VITE_PRINTER_NAME ?? 'DS-RX1',
     // Silent print (no OS dialog). Set false for testing with print preview.
     silent: true,
+    // Print orientation (landscape vs portrait).
+    landscape: import.meta.env.VITE_PRINTER_LANDSCAPE === 'true',
+    // Print rotation in degrees (0, 90, 180, 270).
+    rotation: parseInt(import.meta.env.VITE_PRINTER_ROTATION ?? '0', 10),
   },
   templates: [
     { id: 'duo-2', label: 'DUO', frames: 2, layout: 'vertical' },

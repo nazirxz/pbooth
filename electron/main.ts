@@ -68,72 +68,107 @@ ipcMain.handle('app:version', () => app.getVersion())
 
 ipcMain.handle(
   'printer:print',
-  async (_event, dataUrl: string, opts?: { deviceName?: string; silent?: boolean }) => {
-  const win = BrowserWindow.getFocusedWindow()
-  if (!win) throw new Error('No focused window for print')
-
-  // Resolve the wanted printer by case-insensitive substring match against the
-  // installed printers, so a config of "DS-RX1" matches "DNP DS-RX1". Empty
-  // string => let the OS use its default printer.
-  const wanted = (opts?.deviceName ?? '').trim()
-  let deviceName = wanted
-  if (wanted) {
-    try {
-      const printers = await win.webContents.getPrintersAsync()
-      const match = printers.find((p) => p.name.toLowerCase().includes(wanted.toLowerCase()))
-      deviceName = match ? match.name : wanted
-    } catch {
-      deviceName = wanted
+  async (
+    _event,
+    dataUrl: string,
+    opts?: {
+      deviceName?: string
+      silent?: boolean
+      landscape?: boolean
+      rotation?: number
     }
-  }
-  const silent = opts?.silent ?? true
+  ) => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (!win) throw new Error('No focused window for print')
 
-  return new Promise<void>((resolve, reject) => {
-    const printHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          @page { size: 4in 6in; margin: 0; }
-          html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
-          img { display: block; width: 100%; height: 100%; object-fit: cover; }
-        </style>
-      </head>
-      <body><img src="${dataUrl}" /></body>
-      </html>
-    `
+    const wanted = (opts?.deviceName ?? '').trim()
+    let deviceName = wanted
+    if (wanted) {
+      try {
+        const printers = await win.webContents.getPrintersAsync()
+        const match = printers.find((p) => p.name.toLowerCase().includes(wanted.toLowerCase()))
+        deviceName = match ? match.name : wanted
+      } catch {
+        deviceName = wanted
+      }
+    }
+    const silent = opts?.silent ?? true
+    const landscape = opts?.landscape ?? false
+    const rotation = opts?.rotation ?? 0
 
-    const printWin = new BrowserWindow({
-      show: false,
-      webPreferences: { offscreen: true },
+    return new Promise<void>((resolve, reject) => {
+      const isRotated = rotation === 90 || rotation === 270
+      const imgStyle = isRotated
+        ? `
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 100vh;
+          height: 100vw;
+          transform: translate(-50%, -50%) rotate(${rotation}deg);
+          transform-origin: center center;
+          object-fit: cover;
+        `
+        : `
+          display: block;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transform: rotate(${rotation}deg);
+        `
+
+      const printHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            @page { size: ${landscape ? '6in 4in' : '4in 6in'}; margin: 0; }
+            html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: white; }
+            .print-container {
+              position: relative;
+              width: 100%;
+              height: 100%;
+            }
+            img { ${imgStyle} }
+          </style>
+        </head>
+        <body>
+          <div class="print-container">
+            <img src="${dataUrl}" />
+          </div>
+        </body>
+        </html>
+      `
+
+      const printWin = new BrowserWindow({
+        show: false,
+        webPreferences: { offscreen: true },
+      })
+
+      printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(printHTML)}`)
+
+      printWin.webContents.once('did-finish-load', () => {
+        printWin.webContents.print(
+          {
+            silent,
+            deviceName,
+            printBackground: true,
+            margins: { marginType: 'none' },
+            landscape,
+            pageSize: landscape
+              ? { width: 152_400, height: 101_600 } // 6x4 landscape in microns
+              : { width: 101_600, height: 152_400 }, // 4x6 portrait in microns
+          },
+          (success, failureReason) => {
+            printWin.close()
+            if (success) {
+              resolve()
+            } else {
+              reject(new Error(failureReason || 'Print failed'))
+            }
+          },
+        )
+      })
     })
-
-    printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(printHTML)}`)
-
-    printWin.webContents.once('did-finish-load', () => {
-      printWin.webContents.print(
-        {
-          silent,
-          deviceName,
-          printBackground: true,
-          margins: { marginType: 'none' },
-          landscape: false,
-          // 4R = 4×6 inch portrait, in microns (1 in = 25 400 µm). The composed
-          // strip is 1200×1800 (2:3), so it fills the sheet exactly. Without
-          // this Electron uses the driver default (often 6×4 landscape) and the
-          // portrait image overflows onto a second sheet.
-          pageSize: { width: 101_600, height: 152_400 },
-        },
-        (success, failureReason) => {
-          printWin.close()
-          if (success) {
-            resolve()
-          } else {
-            reject(new Error(failureReason || 'Print failed'))
-          }
-        },
-      )
-    })
-  })
   },
 )
