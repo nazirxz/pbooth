@@ -164,6 +164,11 @@ if (typeof console !== 'undefined') {
   console.info(
     `${tag} mode=${mode} provider=${provider} supabaseConfigured=${supabaseSet} storage=${storageBackend} r2Configured=${r2Set}`,
   )
+  console.info(
+    `${tag} printer deviceName=${appConfig.printer.deviceName || '(default)'} ` +
+      `silent=${appConfig.printer.silent} landscape=${appConfig.printer.landscape} ` +
+      `rotation=${appConfig.printer.rotation}`,
+  )
   if (import.meta.env.PROD && provider === 'mock') {
     console.error(
       `${tag} CRITICAL: production build with MOCK payment provider — ` +
