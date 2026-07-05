@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_DEV_SKIP_BUTTON?: string
   readonly VITE_CAPTURE_COUNTDOWN_SEC?: string
   readonly VITE_PRINTER_SILENT?: string
+  readonly VITE_DCC_CAPTURE_TIMEOUT_MS?: string
 }
 
 interface ImportMeta {

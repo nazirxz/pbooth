@@ -50,7 +50,7 @@ export const appConfig = {
        */
       fallbackToWebcam: import.meta.env.VITE_DCC_FALLBACK !== 'false',
       /** Polling timeout for the file-ready check after a capture, in ms. */
-      captureTimeoutMs: 8_000,
+      captureTimeoutMs: parseInt(import.meta.env.VITE_DCC_CAPTURE_TIMEOUT_MS ?? '12000', 10),
     },
   },
   capture: {
