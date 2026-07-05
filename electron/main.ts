@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron'
+import { app, BrowserWindow, ipcMain, globalShortcut, type IpcMainInvokeEvent } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -8,6 +8,36 @@ const isDev = !!process.env.VITE_DEV_SERVER_URL
 
 // Landscape target 1920x1080. Dev window = scaled to fit laptop display.
 const TARGET = { width: 1920, height: 1080 }
+const PRINT_LOAD_TIMEOUT_MS = 15_000
+
+function getInvokerWindow(event: IpcMainInvokeEvent) {
+  return BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getFocusedWindow()
+}
+
+function summarizePrintPayload(dataUrl: string) {
+  const commaIndex = dataUrl.indexOf(',')
+  const header = commaIndex >= 0 ? dataUrl.slice(0, commaIndex) : dataUrl.slice(0, 80)
+  const payloadLength = commaIndex >= 0 ? dataUrl.length - commaIndex - 1 : dataUrl.length
+  const approxBytes = header.includes(';base64')
+    ? Math.floor((payloadLength * 3) / 4)
+    : Buffer.byteLength(dataUrl)
+
+  return {
+    header,
+    chars: dataUrl.length,
+    approxBytes,
+  }
+}
+
+function summarizePrinters(printers: Awaited<ReturnType<Electron.WebContents['getPrintersAsync']>>) {
+  return printers.map((p) => ({
+    name: p.name,
+    displayName: p.displayName,
+    description: p.description,
+    status: p.status,
+    isDefault: p.isDefault,
+  }))
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -69,7 +99,7 @@ ipcMain.handle('app:version', () => app.getVersion())
 ipcMain.handle(
   'printer:print',
   async (
-    _event,
+    event,
     dataUrl: string,
     opts?: {
       deviceName?: string
@@ -78,20 +108,69 @@ ipcMain.handle(
       rotation?: number
     }
   ) => {
-    const win = BrowserWindow.getFocusedWindow()
-    if (!win) throw new Error('No focused window for print')
+    const win = getInvokerWindow(event)
+    if (!win) {
+      console.error('[printer:main] No renderer window found for print request')
+      throw new Error('No renderer window for print')
+    }
 
     const wanted = (opts?.deviceName ?? '').trim()
     let deviceName = wanted
+    let printerNames: string[] = []
+
+    console.info('[printer:main] Print request received', {
+      requestedDeviceName: wanted || '(default)',
+      options: opts,
+      payload: summarizePrintPayload(dataUrl),
+      senderUrl: event.sender.getURL(),
+    })
+
     if (wanted) {
       try {
         const printers = await win.webContents.getPrintersAsync()
-        const match = printers.find((p) => p.name.toLowerCase().includes(wanted.toLowerCase()))
-        deviceName = match ? match.name : wanted
-      } catch {
+        printerNames = printers.map((p) => p.name)
+        console.info('[printer:main] Installed printers', summarizePrinters(printers))
+
+        const wantedLower = wanted.toLowerCase()
+        const exactMatch = printers.find((p) =>
+          [p.name, p.displayName].some((name) => name?.toLowerCase() === wantedLower),
+        )
+        const partialMatch = printers.find((p) =>
+          [p.name, p.displayName].some((name) => name?.toLowerCase().includes(wantedLower)),
+        )
+        const match = exactMatch ?? partialMatch
+
+        if (!match) {
+          const message = `Printer matching "${wanted}" was not found. Installed printers: ${printerNames.join(', ') || '(none)'}`
+          console.error('[printer:main]', message)
+          throw new Error(message)
+        }
+
+        deviceName = match.name
+        console.info('[printer:main] Matched printer', {
+          requestedDeviceName: wanted,
+          deviceName,
+          displayName: match.displayName,
+          isDefault: match.isDefault,
+          status: match.status,
+        })
+      } catch (e) {
+        console.error('[printer:main] Failed while resolving printer', e)
+        if (e instanceof Error && e.message.includes('was not found')) throw e
         deviceName = wanted
       }
+    } else {
+      try {
+        const printers = await win.webContents.getPrintersAsync()
+        printerNames = printers.map((p) => p.name)
+        console.info('[printer:main] Installed printers', summarizePrinters(printers))
+        const defaultPrinter = printers.find((p) => p.isDefault)
+        console.info('[printer:main] Using default printer', defaultPrinter?.name ?? '(OS default)')
+      } catch (e) {
+        console.warn('[printer:main] Failed to list printers before default print', e)
+      }
     }
+
     const silent = opts?.silent ?? true
     const landscape = opts?.landscape ?? false
     const rotation = opts?.rotation ?? 0
@@ -145,9 +224,90 @@ ipcMain.handle(
         webPreferences: { offscreen: true },
       })
 
-      printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(printHTML)}`)
+      let settled = false
+      const finish = (fn: () => void) => {
+        if (settled) return
+        settled = true
+        clearTimeout(loadTimeout)
+        fn()
+      }
 
-      printWin.webContents.once('did-finish-load', () => {
+      const closePrintWindow = () => {
+        if (!printWin.isDestroyed()) printWin.close()
+      }
+
+      const loadTimeout = setTimeout(() => {
+        finish(() => {
+          const message = `Print page did not finish loading within ${PRINT_LOAD_TIMEOUT_MS}ms`
+          console.error('[printer:main]', message)
+          closePrintWindow()
+          reject(new Error(message))
+        })
+      }, PRINT_LOAD_TIMEOUT_MS)
+
+      printWin.webContents.once('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+        finish(() => {
+          console.error('[printer:main] Print page failed to load', {
+            errorCode,
+            errorDescription,
+            validatedURL: validatedURL.slice(0, 120),
+          })
+          closePrintWindow()
+          reject(new Error(`Print page failed to load: ${errorDescription || errorCode}`))
+        })
+      })
+
+      printWin.webContents.once('render-process-gone', (_event, details) => {
+        finish(() => {
+          console.error('[printer:main] Print window render process gone', details)
+          closePrintWindow()
+          reject(new Error(`Print window renderer crashed: ${details.reason}`))
+        })
+      })
+
+      printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(printHTML)}`).catch((e) => {
+        finish(() => {
+          console.error('[printer:main] Failed to load print page', e)
+          closePrintWindow()
+          reject(e)
+        })
+      })
+
+      printWin.webContents.once('did-finish-load', async () => {
+        try {
+          const imageInfo = await printWin.webContents.executeJavaScript(`
+            new Promise((resolve, reject) => {
+              const img = document.querySelector('img');
+              if (!img) {
+                reject(new Error('Print image element not found'));
+                return;
+              }
+              if (img.complete && img.naturalWidth > 0) {
+                resolve({ width: img.naturalWidth, height: img.naturalHeight });
+                return;
+              }
+              img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+              img.onerror = () => reject(new Error('Print image failed to load'));
+            })
+          `)
+          console.info('[printer:main] Print page ready', {
+            deviceName: deviceName || '(default)',
+            silent,
+            landscape,
+            rotation,
+            pageSize: landscape ? '6x4' : '4x6',
+            image: imageInfo,
+          })
+        } catch (e) {
+          finish(() => {
+            console.error('[printer:main] Print image was not ready', e)
+            closePrintWindow()
+            reject(e)
+          })
+          return
+        }
+
+        clearTimeout(loadTimeout)
         printWin.webContents.print(
           {
             silent,
@@ -160,12 +320,27 @@ ipcMain.handle(
               : { width: 101_600, height: 152_400 }, // 4x6 portrait in microns
           },
           (success, failureReason) => {
-            printWin.close()
-            if (success) {
-              resolve()
-            } else {
-              reject(new Error(failureReason || 'Print failed'))
-            }
+            finish(() => {
+              closePrintWindow()
+              if (success) {
+                console.info('[printer:main] Print job accepted by OS', {
+                  deviceName: deviceName || '(default)',
+                  silent,
+                  landscape,
+                  rotation,
+                })
+                resolve()
+              } else {
+                const message = failureReason || 'Print failed'
+                console.error('[printer:main] Print job failed', {
+                  reason: message,
+                  deviceName: deviceName || '(default)',
+                  requestedDeviceName: wanted || '(default)',
+                  installedPrinters: printerNames,
+                })
+                reject(new Error(message))
+              }
+            })
           },
         )
       })
@@ -173,15 +348,15 @@ ipcMain.handle(
   },
 )
 
-ipcMain.handle('printer:list', async () => {
-  const win = BrowserWindow.getFocusedWindow()
+ipcMain.handle('printer:list', async (event) => {
+  const win = getInvokerWindow(event)
   if (!win) return []
   try {
     const printers = await win.webContents.getPrintersAsync()
+    console.info('[printer:main] Printer list requested', summarizePrinters(printers))
     return printers.map((p) => p.name)
   } catch (e) {
-    console.error('Failed to get printers:', e)
+    console.error('[printer:main] Failed to get printers:', e)
     return []
   }
 })
-

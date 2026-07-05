@@ -8,7 +8,10 @@ interface ImportMetaEnv {
   readonly VITE_DOKU_CREATE_URL?: string
   readonly VITE_DEV_SKIP_BUTTON?: string
   readonly VITE_CAPTURE_COUNTDOWN_SEC?: string
+  readonly VITE_PRINTER_NAME?: string
   readonly VITE_PRINTER_SILENT?: string
+  readonly VITE_PRINTER_LANDSCAPE?: string
+  readonly VITE_PRINTER_ROTATION?: string
   readonly VITE_DCC_CAPTURE_TIMEOUT_MS?: string
 }
 

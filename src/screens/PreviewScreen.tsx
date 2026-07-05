@@ -53,15 +53,19 @@ export function PreviewScreen() {
 
   // List installed printers to the console for easier debug
   useEffect(() => {
-    if (window.pbooth?.getPrinters) {
-      window.pbooth.getPrinters()
-        .then((printers) => {
-          console.log('[printer] Installed printers on this machine:', printers)
-        })
-        .catch((e) => {
-          console.warn('[printer] Failed to fetch printers:', e)
-        })
+    console.info('[printer] Renderer printer config:', appConfig.printer)
+    if (!window.pbooth?.getPrinters) {
+      console.warn('[printer] Electron printer API is unavailable. Are you running in the browser instead of Electron?')
+      return
     }
+
+    window.pbooth.getPrinters()
+      .then((printers) => {
+        console.info('[printer] Installed printers on this machine:', printers)
+      })
+      .catch((e) => {
+        console.warn('[printer] Failed to fetch printers:', e)
+      })
   }, [])
 
   // Generate the QR as soon as we have a sessionId — independent of upload
@@ -174,18 +178,41 @@ export function PreviewScreen() {
   }, [composed, photos, template, filter, sessionId, setComposed, theme, stripColor, placedStickers, liveAsset, setLiveAsset])
 
   const handlePrint = async () => {
-    if (!composed || !window.pbooth?.print) return
+    if (!composed) {
+      console.warn('[printer] Print requested before composed image was ready')
+      return
+    }
+    if (!window.pbooth?.print) {
+      const message = 'Electron print API is unavailable'
+      console.error('[printer]', message)
+      setPrintState('error')
+      setPrintError(message)
+      return
+    }
+
+    const printOptions = {
+      deviceName: appConfig.printer.deviceName,
+      silent: appConfig.printer.silent,
+      landscape: appConfig.printer.landscape,
+      rotation: appConfig.printer.rotation,
+    }
+
+    console.info('[printer] Print requested from preview screen:', {
+      sessionId,
+      template,
+      options: printOptions,
+      blobBytes: composed.blob.size,
+      dataUrl: summarizeDataUrl(composed.dataUrl),
+    })
+
     setPrintState('printing')
     setPrintError(null)
     try {
-      await window.pbooth.print(composed.dataUrl, {
-        deviceName: appConfig.printer.deviceName,
-        silent: appConfig.printer.silent,
-        landscape: appConfig.printer.landscape,
-        rotation: appConfig.printer.rotation,
-      })
+      await window.pbooth.print(composed.dataUrl, printOptions)
+      console.info('[printer] Print completed successfully')
       setPrintState('success')
     } catch (err) {
+      console.error('[printer] Print failed:', err)
       setPrintState('error')
       setPrintError(err instanceof Error ? err.message : 'Print failed')
     }
@@ -331,4 +358,17 @@ function blobToDataUrl(blob: Blob) {
     r.onerror = reject
     r.readAsDataURL(blob)
   })
+}
+
+function summarizeDataUrl(dataUrl: string) {
+  const commaIndex = dataUrl.indexOf(',')
+  const header = commaIndex >= 0 ? dataUrl.slice(0, commaIndex) : dataUrl.slice(0, 80)
+  const payloadLength = commaIndex >= 0 ? dataUrl.length - commaIndex - 1 : dataUrl.length
+  return {
+    header,
+    chars: dataUrl.length,
+    approxBytes: header.includes(';base64')
+      ? Math.floor((payloadLength * 3) / 4)
+      : new Blob([dataUrl]).size,
+  }
 }
