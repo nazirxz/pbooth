@@ -172,7 +172,6 @@ export function PreviewScreen() {
         rotation: appConfig.printer.rotation,
       })
       setPrintState('success')
-      setTimeout(() => setPrintState('idle'), 3000)
     } catch (err) {
       setPrintState('error')
       setPrintError(err instanceof Error ? err.message : 'Print failed')
@@ -222,7 +221,7 @@ export function PreviewScreen() {
               variant="primary"
               size="lg"
               onClick={handlePrint}
-              disabled={!composed || printState === 'printing'}
+              disabled={!composed || printState === 'printing' || printState === 'success'}
             >
               {printState === 'printing' ? '⏳ PRINTING...' : printState === 'success' ? '✓ PRINTED' : '🖨 PRINT NOW'}
             </TVButton>
