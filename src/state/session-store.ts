@@ -86,8 +86,24 @@ export const useSession = create<SessionState>((set) => ({
   setTemplate: (template) => set({ template }),
   setFilter: (filter) => set({ filter }),
   addPhoto: (photo) => set((s) => ({ photos: [...s.photos, photo] })),
-  clearPhotos: () => set({ photos: [] }),
+  clearPhotos: () =>
+    set((s) => {
+      s.photos.forEach((p) => {
+        if (p.dataUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(p.dataUrl)
+        }
+      })
+      return { photos: [] }
+    }),
   setComposed: (composed) => set({ composed }),
   setLiveAsset: (liveAsset) => set({ liveAsset }),
-  reset: () => set({ ...initial, screen: 'home' }),
+  reset: () =>
+    set((s) => {
+      s.photos.forEach((p) => {
+        if (p.dataUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(p.dataUrl)
+        }
+      })
+      return { ...initial, screen: 'home' }
+    }),
 }))

@@ -8,6 +8,7 @@ import { useTheme } from '@/state/theme-store'
 import { STICKERS, getSticker } from '@/lib/stickers'
 import { computePaperLayout, type PaperLayout } from '@/lib/strip-layout'
 import { buildGifFromPhotos } from '@/lib/gif-encoder'
+import { uploadPhoto } from '@/lib/storage'
 
 type Step = 'sticker' | 'color'
 
@@ -32,6 +33,102 @@ export function DecorateScreen() {
   const setStickerScale = useDecoration((s) => s.setStickerScale)
 
   const [step, setStep] = useState<Step>('sticker')
+
+  const sessionId = useSession((s) => s.sessionId)
+  const [uploadStatuses, setUploadStatuses] = useState<Record<number, 'idle' | 'uploading' | 'success' | 'error'>>({})
+  const [isCheckingUpload, setIsCheckingUpload] = useState(false)
+  const [hasUploadError, setHasUploadError] = useState(false)
+  const uploadPromisesRef = useRef<Record<number, Promise<string | null>>>({})
+
+  // Start background upload of all photos on mount
+  useEffect(() => {
+    if (!sessionId || photos.length === 0) return
+
+    const startUpload = (p: CapturedPhoto) => {
+      setUploadStatuses((prev) => ({ ...prev, [p.index]: 'uploading' }))
+      
+      const promise = uploadPhoto(sessionId, p.index, p.blob)
+        .then((path) => {
+          if (path) {
+            setUploadStatuses((prev) => ({ ...prev, [p.index]: 'success' }))
+            return path
+          } else {
+            setUploadStatuses((prev) => ({ ...prev, [p.index]: 'error' }))
+            setHasUploadError(true)
+            return null
+          }
+        })
+        .catch((err) => {
+          console.error(`Upload failed for photo ${p.index}:`, err)
+          setUploadStatuses((prev) => ({ ...prev, [p.index]: 'error' }))
+          setHasUploadError(true)
+          return null
+        })
+
+      uploadPromisesRef.current[p.index] = promise
+    }
+
+    photos.forEach((p) => {
+      startUpload(p)
+    })
+  }, [sessionId, photos])
+
+  const handleRetryUpload = () => {
+    if (!sessionId) return
+    setHasUploadError(false)
+    
+    photos.forEach((p) => {
+      if (uploadStatuses[p.index] === 'error') {
+        setUploadStatuses((prev) => ({ ...prev, [p.index]: 'uploading' }))
+        const promise = uploadPhoto(sessionId, p.index, p.blob)
+          .then((path) => {
+            if (path) {
+              setUploadStatuses((prev) => ({ ...prev, [p.index]: 'success' }))
+              return path
+            } else {
+              setUploadStatuses((prev) => ({ ...prev, [p.index]: 'error' }))
+              setHasUploadError(true)
+              return null
+            }
+          })
+          .catch((err) => {
+            console.error(`Retry upload failed for photo ${p.index}:`, err)
+            setUploadStatuses((prev) => ({ ...prev, [p.index]: 'error' }))
+            setHasUploadError(true)
+            return null
+          })
+        uploadPromisesRef.current[p.index] = promise
+      }
+    })
+  }
+
+  const handleDone = async () => {
+    if (!sessionId) {
+      goTo('preview')
+      return
+    }
+
+    setIsCheckingUpload(true)
+    
+    try {
+      const promises = Object.values(uploadPromisesRef.current)
+      const results = await Promise.all(promises)
+      
+      const hasErrors = results.some((r) => r === null)
+      if (hasErrors) {
+        setIsCheckingUpload(false)
+        setHasUploadError(true)
+        return
+      }
+
+      setIsCheckingUpload(false)
+      goTo('preview')
+    } catch (e) {
+      console.error('Error waiting for uploads:', e)
+      setIsCheckingUpload(false)
+      setHasUploadError(true)
+    }
+  }
 
   // Reset decoration for a fresh session.
   useEffect(() => {
@@ -125,7 +222,7 @@ export function DecorateScreen() {
                 <TVButton variant="ghost" size="md" onClick={() => setStep('sticker')}>
                   ◀ BACK
                 </TVButton>
-                <TVButton variant="primary" size="lg" onClick={() => goTo('preview')}>
+                <TVButton variant="primary" size="lg" onClick={handleDone}>
                   DONE ▶
                 </TVButton>
               </>
@@ -133,6 +230,37 @@ export function DecorateScreen() {
           </div>
         </div>
       </div>
+
+      {/* Background Upload Progress Overlay */}
+      {isCheckingUpload && (
+        <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center gap-4 z-50 animate-fadeIn">
+          <div className="w-16 h-16 border-4 border-crt-phosphor border-t-transparent rounded-full animate-spin mb-2" />
+          <div className="font-crt text-3xl text-crt-phosphor tracking-widest animate-pulse">
+            SAVING PHOTOS TO CLOUD...
+          </div>
+          <div className="font-crt text-lg text-crt-cream/65">
+            Please wait while we secure your pictures
+          </div>
+        </div>
+      )}
+
+      {/* Upload Error Overlay */}
+      {hasUploadError && !isCheckingUpload && (
+        <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-6 z-50 p-8 text-center animate-fadeIn">
+          <div className="font-pixel text-5xl text-red-500 mb-2 rgb-split">UPLOAD FAILED</div>
+          <div className="font-crt text-lg text-crt-cream max-w-md leading-relaxed">
+            Some photos failed to upload to the server. Please check your internet connection and try again.
+          </div>
+          <div className="flex gap-4">
+            <TVButton variant="ghost" size="md" onClick={handleRetryUpload}>
+              🔄 RETRY UPLOAD
+            </TVButton>
+            <TVButton variant="primary" size="md" onClick={() => goTo('preview')}>
+              ⏭ SKIP (LOCAL ONLY)
+            </TVButton>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
