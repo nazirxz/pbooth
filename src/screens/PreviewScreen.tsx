@@ -168,6 +168,8 @@ export function PreviewScreen() {
       await window.pbooth.print(composed.dataUrl, {
         deviceName: appConfig.printer.deviceName,
         silent: appConfig.printer.silent,
+        landscape: appConfig.printer.landscape,
+        rotation: appConfig.printer.rotation,
       })
       setPrintState('success')
       setTimeout(() => setPrintState('idle'), 3000)
