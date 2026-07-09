@@ -1,4 +1,5 @@
 import { getSupabase } from './client'
+import { getAdminSupabase } from './admin-client'
 import type { PaymentStatus } from '@/lib/payment'
 
 export interface PaymentRow {
@@ -76,5 +77,43 @@ export function subscribePaymentStatus(
     .subscribe()
   return () => {
     sb.removeChannel(channel)
+  }
+}
+
+// ─── Admin ────────────────────────────────────────────────────────────────
+
+export interface AdminStats {
+  totalSessions: number
+  paidSessions: number
+  totalRevenue: number
+  todaySessions: number
+  todayRevenue: number
+}
+
+export async function dbGetAdminStats(): Promise<AdminStats | null> {
+  const sb = getAdminSupabase()
+  if (!sb) return null
+
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  const todayIso = todayStart.toISOString()
+
+  const [totalRes, paidRes, revenueRes, todaySessionRes, todayRevenueRes] = await Promise.all([
+    sb.from('sessions').select('id', { count: 'exact', head: true }),
+    sb.from('sessions').select('id', { count: 'exact', head: true }).eq('status', 'completed'),
+    sb.from('payments').select('amount').eq('status', 'paid'),
+    sb.from('sessions').select('id', { count: 'exact', head: true }).gte('created_at', todayIso),
+    sb.from('payments').select('amount').eq('status', 'paid').gte('created_at', todayIso),
+  ])
+
+  const totalRevenue = (revenueRes.data ?? []).reduce((s, r) => s + (r.amount ?? 0), 0)
+  const todayRevenue = (todayRevenueRes.data ?? []).reduce((s, r) => s + (r.amount ?? 0), 0)
+
+  return {
+    totalSessions: totalRes.count ?? 0,
+    paidSessions: paidRes.count ?? 0,
+    totalRevenue,
+    todaySessions: todaySessionRes.count ?? 0,
+    todayRevenue,
   }
 }
