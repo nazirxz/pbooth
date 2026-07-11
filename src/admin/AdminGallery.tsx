@@ -234,9 +234,9 @@ function SessionCard({ session, deleting, confirming, onView, onDeleteRequest, o
             <button
               id={`admin-delete-${session.id.slice(0, 8)}`}
               onClick={onDeleteRequest}
-              className="font-crt text-crt-cream/25 hover:text-crt-red text-xs tracking-wider transition-colors"
+              className="font-pixel text-[8px] tracking-widest text-crt-red/70 hover:text-crt-red border border-crt-red/20 hover:border-crt-red/50 hover:bg-crt-red/10 px-2.5 py-1 rounded transition-colors"
             >
-              ✕ hapus
+              ✕ HAPUS
             </button>
           )}
         </div>
