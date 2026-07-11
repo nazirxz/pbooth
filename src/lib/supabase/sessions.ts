@@ -80,7 +80,7 @@ export async function dbListSessions(
 
   let q = sb
     .from('sessions')
-    .select('*, payments(*)', { count: 'exact' })
+    .select('*, payments!session_id(*)', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(from, to)
 
