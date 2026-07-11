@@ -4,9 +4,14 @@ import {
   type AdminSessionRow,
   type ListSessionsOpts,
   dbDeleteSession,
+  dbGetSessionRawPhotos,
+  type AdminPhotoRow,
 } from '@/lib/supabase/sessions'
 import { dbGetAdminStats, type AdminStats } from '@/lib/supabase/payments'
 import { adminSupabaseReady } from '@/lib/supabase/admin-client'
+
+export { dbGetSessionRawPhotos as getSessionRawPhotos }
+export type { AdminPhotoRow }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────
 

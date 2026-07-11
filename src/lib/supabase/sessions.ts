@@ -1,6 +1,7 @@
 import { getSupabase } from './client'
 import { getAdminSupabase } from './admin-client'
 import { appConfig } from '@/config/app-config'
+import { getR2SignedUrl } from '@/lib/r2/photos'
 
 export interface SessionRow {
   id: string
@@ -129,4 +130,48 @@ export async function dbDeleteSession(id: string): Promise<{ ok: boolean; error?
     return { ok: false, error: error.message }
   }
   return { ok: true }
+}
+
+export interface AdminPhotoRow {
+  index: number
+  url: string
+}
+
+export async function dbGetSessionRawPhotos(
+  sessionId: string,
+): Promise<AdminPhotoRow[] | null> {
+  const sb = getAdminSupabase()
+  if (!sb) return null
+
+  const { data: photos, error } = await sb
+    .from('photos')
+    .select('frame_index, storage_path')
+    .eq('session_id', sessionId)
+    .order('frame_index')
+
+  if (error) {
+    console.warn('[admin] dbGetSessionRawPhotos failed:', error.message)
+    return null
+  }
+
+  const SIGNED_URL_TTL = 60 * 60 * 24 * 7 // 7 days
+  const isR2 = appConfig.storage.backend === 'r2'
+  const photoEntries: AdminPhotoRow[] = []
+
+  for (const p of photos ?? []) {
+    if (isR2) {
+      const signedUrl = await getR2SignedUrl(p.storage_path, SIGNED_URL_TTL)
+      if (signedUrl) {
+        photoEntries.push({ index: p.frame_index, url: signedUrl })
+      }
+    } else {
+      const { data: signed, error: signErr } = await sb.storage
+        .from(appConfig.supabase.photosBucket)
+        .createSignedUrl(p.storage_path, SIGNED_URL_TTL)
+      if (signErr || !signed) continue
+      photoEntries.push({ index: p.frame_index, url: signed.signedUrl })
+    }
+  }
+
+  return photoEntries
 }

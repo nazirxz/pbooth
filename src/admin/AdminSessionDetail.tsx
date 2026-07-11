@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AdminSessionRow } from '@/lib/supabase/sessions'
-import { deleteSession, formatDateTime, formatIDR, statusColor } from './admin-data'
+import { deleteSession, formatDateTime, formatIDR, statusColor, getSessionRawPhotos, type AdminPhotoRow } from './admin-data'
 
 interface Props {
   session: AdminSessionRow
@@ -11,6 +11,8 @@ interface Props {
 export function AdminSessionDetail({ session, onClose, onDeleted }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [rawPhotos, setRawPhotos] = useState<AdminPhotoRow[] | null>(null)
+  const [loadingRaw, setLoadingRaw] = useState(false)
   const payment = session.payments?.[0]
 
   // Close on Escape
@@ -19,6 +21,24 @@ export function AdminSessionDetail({ session, onClose, onDeleted }: Props) {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
+
+  // Load raw photos
+  useEffect(() => {
+    let active = true
+    async function loadRaw() {
+      setLoadingRaw(true)
+      try {
+        const photos = await getSessionRawPhotos(session.id)
+        if (active) setRawPhotos(photos)
+      } catch (err) {
+        console.error('Failed to load raw photos:', err)
+      } finally {
+        if (active) setLoadingRaw(false)
+      }
+    }
+    loadRaw()
+    return () => { active = false }
+  }, [session.id])
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -157,6 +177,50 @@ export function AdminSessionDetail({ session, onClose, onDeleted }: Props) {
               )}
             </div>
           </div>
+
+          {/* Raw Photos section */}
+          {((rawPhotos && rawPhotos.length > 0) || loadingRaw) && (
+            <div className="border-t border-crt-cream/10 pt-5">
+              <div className="font-crt text-xs text-crt-cream/40 tracking-widest mb-3">
+                ◆ FOTO INDIVIDUAL (RAW FRAMES)
+              </div>
+              {loadingRaw ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="aspect-[4/3] rounded-lg border border-crt-cream/10 bg-black/40 animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {rawPhotos?.map((p) => (
+                    <div
+                      key={p.index}
+                      className="relative group rounded-lg border border-crt-cream/15 overflow-hidden bg-black aspect-[4/3]"
+                    >
+                      <a
+                        href={p.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block w-full h-full"
+                      >
+                        <img
+                          src={p.url}
+                          alt={`Frame ${p.index}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        />
+                      </a>
+                      <div className="absolute bottom-1.5 left-1.5 bg-black/75 border border-crt-cream/10 px-1.5 py-0.5 rounded text-[8px] font-pixel text-crt-phosphor leading-none">
+                        FRAME {p.index + 1}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Delete section */}
           <div className="border-t border-crt-cream/10 pt-5">
