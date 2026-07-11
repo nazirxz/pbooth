@@ -1,6 +1,6 @@
 {
   "name": "pbooth",
-  "version": "0.2.0",
+  "version": "0.2.0-development",
   "description": "Retro TV photobooth kiosk app",
   "main": "dist-electron/main.js",
   "type": "module",
@@ -10,6 +10,7 @@
     "dev:web": "PBOOTH_TARGET=web vite",
     "build": "tsc -b && vite build && electron-builder",
     "build:win": "tsc -b && vite build && electron-builder --win --x64",
+    "build:win:dev": "tsc -b && vite build --mode development && electron-builder --win --x64",
     "build:web": "PBOOTH_TARGET=web tsc -b && PBOOTH_TARGET=web vite build",
     "pack": "tsc -b && vite build && electron-builder --dir",
     "preview": "vite preview",
