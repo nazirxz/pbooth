@@ -91,11 +91,17 @@ export class DigiCamClient {
       const res = await this.fetchSlc('get', 'lastcaptured', '', this.defaultTimeoutMs, false)
       if ('response' in res) {
         const path = res.response.trim()
-        if (path && path !== '?' && path !== prev) {
+        // digiCamControl returns placeholder values while the camera is busy
+        // writing the file: '-', '?', 'null', or empty string. We must skip
+        // these and keep polling until a real filename (with an extension)
+        // appears that differs from the previous capture.
+        if (path && path !== prev && isValidCapturePath(path)) {
           console.info('[digicam] captured file detected', { path, polls })
           return path
         }
-        lastSeen = path || lastSeen
+        if (path && path !== '-' && path !== '?' && path !== 'null') {
+          lastSeen = path
+        }
       }
       await wait(150)
     }
@@ -116,22 +122,47 @@ export class DigiCamClient {
    * `/image/<filename>`. `pathOrName` may be either a full local path
    * (Windows) or a bare filename — we strip directories either way.
    */
-  async downloadImage(pathOrName: string): Promise<Blob> {
+  async downloadImage(pathOrName: string, timeoutMs = this.defaultTimeoutMs): Promise<Blob> {
     const filename = pathOrName.split(/[\\/]/).pop() ?? pathOrName
     const url = `${this.baseUrl}/image/${encodeURIComponent(filename)}?t=${Date.now()}`
-    console.info('[digicam] downloading image', { filename, url })
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`digiCamControl image ${filename}: HTTP ${res.status}`)
-    const blob = await res.blob()
-    if (blob.size <= 0) {
-      throw new Error(`digiCamControl image ${filename}: empty response blob`)
+    console.info('[digicam] downloading image', { filename, url, timeoutMs })
+
+    const maxRetries = 5
+    let lastError: Error | null = null
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), timeoutMs)
+
+      try {
+        const res = await fetch(url, { signal: ctrl.signal })
+        if (!res.ok) throw new Error(`digiCamControl image ${filename}: HTTP ${res.status}`)
+        const blob = await res.blob()
+        if (blob.size > 0) {
+          console.info('[digicam] image downloaded successfully', {
+            filename,
+            blobBytes: blob.size,
+            blobType: blob.type || '(unknown)',
+            attempt,
+          })
+          clearTimeout(t)
+          return blob
+        }
+        throw new Error(`digiCamControl image ${filename}: empty response blob`)
+      } catch (e) {
+        lastError = e instanceof Error ? e : new Error(String(e))
+        console.warn(`[digicam] download image attempt ${attempt}/${maxRetries} failed`, {
+          filename,
+          error: lastError.message,
+        })
+        clearTimeout(t)
+        if (attempt < maxRetries) {
+          await wait(300 * attempt)
+        }
+      }
     }
-    console.info('[digicam] image downloaded', {
-      filename,
-      blobBytes: blob.size,
-      blobType: blob.type || '(unknown)',
-    })
-    return blob
+
+    throw lastError || new Error(`Failed to download image ${filename} after ${maxRetries} attempts`)
   }
 
   private async fetchSlc(
@@ -192,3 +223,18 @@ export class DigiCamClient {
 function wait(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms))
 }
+
+/**
+ * Returns true when `path` looks like a real captured-file path rather than
+ * one of digiCamControl's placeholder/busy values ('-', '?', 'null', empty).
+ * A real path contains a dot (file extension) — e.g. 'DSC_0091.jpg' or
+ * 'C:\\photos\\DSC_0091.jpg'.
+ */
+function isValidCapturePath(path: string): boolean {
+  if (!path) return false
+  const invalid = ['-', '?', 'null', 'error']
+  if (invalid.includes(path.toLowerCase())) return false
+  // Must contain a file extension (dot followed by at least one char)
+  return /\.\w+$/.test(path.split(/[\\/]/).pop() ?? '')
+}
+

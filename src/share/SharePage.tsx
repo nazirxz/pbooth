@@ -157,7 +157,7 @@ function LiveSection({ url, sessionId }: { url: string; sessionId: string }) {
   const isVideo = ext === 'webm' || ext === 'mp4'
   return (
     <section>
-      <SectionTitle channel="03">LIVE PHOTO</SectionTitle>
+      <SectionTitle channel="03">GIF PHOTO</SectionTitle>
       <div className="bg-black rounded-xl border-2 border-crt-cream/30 overflow-hidden mb-4">
         {isVideo ? (
           <video
@@ -172,14 +172,14 @@ function LiveSection({ url, sessionId }: { url: string; sessionId: string }) {
         ) : (
           <img
             src={url}
-            alt="Live photo GIF"
+            alt="GIF photo"
             className="block w-full h-auto"
             loading="lazy"
           />
         )}
       </div>
       <DownloadLink href={url} filename={`pbooth_${sessionId.slice(0, 8)}_live.${ext}`}>
-        ⬇ DOWNLOAD LIVE PHOTO
+        ⬇ DOWNLOAD GIF PHOTO
       </DownloadLink>
       <p className="font-crt text-sm text-crt-cream/50 mt-3 text-center leading-snug">
         Format {ext.toUpperCase()} · simpan ke galeri & share langsung
@@ -191,7 +191,7 @@ function LiveSection({ url, sessionId }: { url: string; sessionId: string }) {
 function LivePending() {
   return (
     <section>
-      <SectionTitle channel="03">LIVE PHOTO</SectionTitle>
+      <SectionTitle channel="03">GIF PHOTO</SectionTitle>
       <div className="bg-black/40 border-2 border-dashed border-crt-cream/30 rounded-xl p-6 text-center">
         <div className="font-crt text-lg text-crt-amber animate-blink tracking-widest mb-1">
           ▌ ENCODING...

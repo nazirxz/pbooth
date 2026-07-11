@@ -63,9 +63,9 @@ export const appConfig = {
     // How long to show the just-captured photo as a review popup before the
     // next shot — doubles as confirmation feedback and hides the tether
     // download wait behind something the customer actually wants to see.
-    reviewMs: 1_500,
+    reviewMs: parseInt(import.meta.env.VITE_CAPTURE_REVIEW_MS ?? '1500', 10),
     // Brief breath after the review before the next countdown starts.
-    delayBetweenFramesMs: 250,
+    delayBetweenFramesMs: parseInt(import.meta.env.VITE_DELAY_BETWEEN_FRAMES_MS ?? '250', 10),
   },
   payment: {
     enabled: true,

@@ -323,7 +323,7 @@ ipcMain.handle(
             silent,
             landscape,
             rotation,
-            pageSize: landscape ? '6x4' : '4x6',
+            pageSize: '4x6',
             image: imageInfo,
           })
         } catch (e) {
@@ -343,9 +343,11 @@ ipcMain.handle(
             printBackground: true,
             margins: { marginType: 'none' },
             landscape,
-            pageSize: landscape
-              ? { width: 152_400, height: 101_600 } // 6x4 landscape in microns
-              : { width: 101_600, height: 152_400 }, // 4x6 portrait in microns
+            // Always send 4x6 portrait page size (101600 × 152400 microns).
+            // DNP DS-RX1 driver only exposes 'PR (4x6)' — there is no '6x4'
+            // profile. The `landscape` flag rotates the content within the
+            // page, it does NOT change the paper size definition.
+            pageSize: { width: 101_600, height: 152_400 },
           },
           (success, failureReason) => {
             finish(() => {
@@ -357,7 +359,7 @@ ipcMain.handle(
                   silent,
                   landscape,
                   rotation,
-                  pageSize: landscape ? '6x4' : '4x6',
+                  pageSize: '4x6',
                   note:
                     'Electron/Windows accepted the print job. This does not prove the physical printer completed it.',
                   printer: matchedPrinter,
