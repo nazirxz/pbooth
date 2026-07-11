@@ -56,8 +56,10 @@ foto diambil dengan **shutter mekanik betulan** → **pop-up flash nyala** dan h
    - **HDMI output → aktif**; tekan **DISP/INFO** sampai overlay info hilang (feed capture card bersih)
    - **Flash exposure compensation → −1/3 s/d −1** bila pop-up terlalu keras di wajah
 5. Parameter awal (atur via dial body, harus cocok dengan `.env` di section E):
-   - **ISO 400** · **Shutter 1/125** (≤ 1/200 wajib utk flash) · **Aperture f/5.6** · **WB Flash**
-6. Jarak customer **~1.5–2.5 m** dari kamera supaya pop-up flash cukup menjangkau di ISO 400 f/5.6.
+   - **ISO 800** · **Shutter 1/125** (≤ 1/200 wajib utk flash) · **Aperture f/8** · **WB Flash**
+6. Untuk booth yang sering gagal fokus, pakai **MF di lensa** lalu kunci fokus ke tanda lantai
+   **~1.8–2.0 m**. `f/8` memberi toleransi fokus lebih luas daripada `f/5.6`; ISO 800 mengganti
+   cahaya yang hilang dari aperture lebih kecil.
 
 ---
 
@@ -94,9 +96,9 @@ foto diambil dengan **shutter mekanik betulan** → **pop-up flash nyala** dan h
 # 800D via digiCamControl tether (manual mode + pop-up flash, full-res)
 VITE_CAMERA_SOURCE=dslr
 VITE_DCC_URL=http://localhost:5513
-VITE_DCC_ISO=400
+VITE_DCC_ISO=800
 VITE_DCC_SHUTTER=1/125      # WAJIB <= 1/200 (flash X-sync 800D); 1/160 juga aman
-VITE_DCC_APERTURE=5.6
+VITE_DCC_APERTURE=8
 VITE_DCC_WB=Flash
 VITE_DCC_FALLBACK=true      # booth tetap jalan (degrade ke snapshot HDMI tanpa flash)
                             # kalau digiCamControl mati; warning tetap muncul di console

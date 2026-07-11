@@ -60,6 +60,18 @@ html.share-mode #root {
   cursor: auto;
 }
 
+/* Admin page — re-enable scrolling, selection, and cursor. */
+html.admin-mode,
+html.admin-mode body,
+html.admin-mode #root {
+  overflow: auto;
+  height: auto;
+  min-height: 100%;
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: auto;
+}
+
 body::-webkit-scrollbar { display: none; }
 
 /* ─────────── RETRO EFFECTS (used by retro theme frame + screens) ─────────── */

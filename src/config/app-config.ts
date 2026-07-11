@@ -34,13 +34,16 @@ export const appConfig = {
        * FLASH SYNC: with a flash the shutter must stay at/below the body's
        * X-sync speed (1/200s on the EOS 800D) or a black band appears. Keep
        * VITE_DCC_SHUTTER <= 1/200 (1/125–1/160 is the safe range).
+       * For booth reliability prefer f/8 + manual focus at the floor mark.
+       * ISO 800 offsets the one-stop light loss from f/5.6 -> f/8 while
+       * keeping the 800D clean enough for 4R prints.
        * WHITE BALANCE: default 'Flash' keeps colours consistent since the
        * pop-up flash is the dominant light source.
        */
       capture: {
         iso: import.meta.env.VITE_DCC_ISO ?? '400',
         shutter: import.meta.env.VITE_DCC_SHUTTER ?? '1/125',
-        aperture: import.meta.env.VITE_DCC_APERTURE ?? '5.6',
+        aperture: import.meta.env.VITE_DCC_APERTURE ?? '8',
         whitebalance: import.meta.env.VITE_DCC_WB ?? 'Flash',
       },
       /**

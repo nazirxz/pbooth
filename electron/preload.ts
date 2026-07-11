@@ -1,5 +1,25 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+interface PrinterSummary {
+  name: string
+  displayName?: string
+  description?: string
+  status: number
+  isDefault: boolean
+}
+
+interface PrintResult {
+  acceptedByOS: boolean
+  deviceName: string
+  requestedDeviceName: string
+  silent: boolean
+  landscape: boolean
+  rotation: number
+  pageSize: string
+  note: string
+  printer?: PrinterSummary
+}
+
 contextBridge.exposeInMainWorld('pbooth', {
   quit: () => ipcRenderer.invoke('app:quit'),
   version: () => ipcRenderer.invoke('app:version'),
@@ -11,7 +31,7 @@ contextBridge.exposeInMainWorld('pbooth', {
       landscape?: boolean
       rotation?: number
     }
-  ) => ipcRenderer.invoke('printer:print', dataUrl, opts),
+  ) => ipcRenderer.invoke('printer:print', dataUrl, opts) as Promise<PrintResult>,
   getPrinters: () => ipcRenderer.invoke('printer:list'),
 })
 
@@ -28,8 +48,8 @@ declare global {
           landscape?: boolean
           rotation?: number
         }
-      ) => Promise<void>
-      getPrinters: () => Promise<string[]>
+      ) => Promise<PrintResult>
+      getPrinters: () => Promise<PrinterSummary[]>
     }
   }
 }
