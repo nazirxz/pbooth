@@ -41,7 +41,7 @@ export const appConfig = {
        * pop-up flash is the dominant light source.
        */
       capture: {
-        iso: import.meta.env.VITE_DCC_ISO ?? '800',
+        iso: import.meta.env.VITE_DCC_ISO ?? '400',
         shutter: import.meta.env.VITE_DCC_SHUTTER ?? '1/125',
         aperture: import.meta.env.VITE_DCC_APERTURE ?? '8',
         whitebalance: import.meta.env.VITE_DCC_WB ?? 'Flash',

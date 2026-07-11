@@ -70,7 +70,7 @@ export interface ListSessionsOpts {
 
 export async function dbListSessions(
   opts: ListSessionsOpts = {},
-): Promise<{ rows: AdminSessionRow[]; total: number } | null> {
+): Promise<{ rows: AdminSessionRow[]; total: number; error?: string } | null> {
   const sb = getAdminSupabase()
   if (!sb) return null
 
@@ -91,7 +91,7 @@ export async function dbListSessions(
   const { data, error, count } = await q
   if (error) {
     console.warn('[admin] listSessions failed:', error.message)
-    return null
+    return { rows: [], total: 0, error: error.message }
   }
   return { rows: (data ?? []) as AdminSessionRow[], total: count ?? 0 }
 }

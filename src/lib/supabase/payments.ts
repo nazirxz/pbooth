@@ -106,6 +106,12 @@ export async function dbGetAdminStats(): Promise<AdminStats | null> {
     sb.from('payments').select('amount').eq('status', 'paid').gte('created_at', todayIso),
   ])
 
+  const firstError = totalRes.error || paidRes.error || revenueRes.error || todaySessionRes.error || todayRevenueRes.error
+  if (firstError) {
+    console.warn('[admin] getAdminStats failed:', firstError.message)
+    throw new Error(firstError.message)
+  }
+
   const totalRevenue = (revenueRes.data ?? []).reduce((s, r) => s + (r.amount ?? 0), 0)
   const todayRevenue = (todayRevenueRes.data ?? []).reduce((s, r) => s + (r.amount ?? 0), 0)
 

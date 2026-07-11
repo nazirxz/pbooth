@@ -208,8 +208,8 @@ export function PreviewScreen() {
     setPrintState('printing')
     setPrintError(null)
     try {
-      await window.pbooth.print(composed.dataUrl, printOptions)
-      console.info('[printer] Print completed successfully')
+      const result = await window.pbooth.print(composed.dataUrl, printOptions)
+      console.info('[printer] Print submitted to OS:', result)
       setPrintState('success')
     } catch (err) {
       console.error('[printer] Print failed:', err)
@@ -263,7 +263,7 @@ export function PreviewScreen() {
               onClick={handlePrint}
               disabled={!composed || printState === 'printing' || printState === 'success'}
             >
-              {printState === 'printing' ? '⏳ PRINTING...' : printState === 'success' ? '✓ PRINTED' : '🖨 PRINT NOW'}
+              {printState === 'printing' ? '⏳ PRINTING...' : printState === 'success' ? '✓ SENT' : '🖨 PRINT NOW'}
             </TVButton>
             <TVButton variant="primary" size="lg" onClick={reset}>
               ▶ NEW SESSION

@@ -72,6 +72,7 @@ export function useAdminSessions(opts: ListSessionsOpts) {
     try {
       const data = await dbListSessions(opts)
       if (!data) throw new Error('Admin Supabase client not configured')
+      if (data.error) throw new Error(data.error)
       setRows(data.rows)
       setTotal(data.total)
     } catch (e) {

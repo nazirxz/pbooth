@@ -19,6 +19,26 @@ interface ImportMeta {
   readonly env: ImportMetaEnv
 }
 
+interface PrinterSummary {
+  name: string
+  displayName?: string
+  description?: string
+  status: number
+  isDefault: boolean
+}
+
+interface PrintResult {
+  acceptedByOS: boolean
+  deviceName: string
+  requestedDeviceName: string
+  silent: boolean
+  landscape: boolean
+  rotation: number
+  pageSize: string
+  note: string
+  printer?: PrinterSummary
+}
+
 interface Window {
   pbooth?: {
     quit: () => Promise<void>
@@ -31,8 +51,8 @@ interface Window {
         landscape?: boolean
         rotation?: number
       }
-    ) => Promise<void>
-    getPrinters: () => Promise<string[]>
+    ) => Promise<PrintResult>
+    getPrinters: () => Promise<PrinterSummary[]>
   }
 }
 

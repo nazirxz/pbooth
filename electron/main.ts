@@ -9,6 +9,27 @@ const isDev = !!process.env.VITE_DEV_SERVER_URL
 // Landscape target 1920x1080. Dev window = scaled to fit laptop display.
 const TARGET = { width: 1920, height: 1080 }
 const PRINT_LOAD_TIMEOUT_MS = 15_000
+const PRINT_WINDOW_CLOSE_DELAY_MS = 5_000
+
+interface PrinterSummary {
+  name: string
+  displayName?: string
+  description?: string
+  status: number
+  isDefault: boolean
+}
+
+interface PrintResult {
+  acceptedByOS: boolean
+  deviceName: string
+  requestedDeviceName: string
+  silent: boolean
+  landscape: boolean
+  rotation: number
+  pageSize: string
+  note: string
+  printer?: PrinterSummary
+}
 
 function getInvokerWindow(event: IpcMainInvokeEvent) {
   return BrowserWindow.fromWebContents(event.sender) ?? BrowserWindow.getFocusedWindow()
@@ -29,7 +50,9 @@ function summarizePrintPayload(dataUrl: string) {
   }
 }
 
-function summarizePrinters(printers: Awaited<ReturnType<Electron.WebContents['getPrintersAsync']>>) {
+function summarizePrinters(
+  printers: Awaited<ReturnType<Electron.WebContents['getPrintersAsync']>>,
+): PrinterSummary[] {
   return printers.map((p) => ({
     name: p.name,
     displayName: p.displayName,
@@ -117,6 +140,7 @@ ipcMain.handle(
     const wanted = (opts?.deviceName ?? '').trim()
     let deviceName = wanted
     let printerNames: string[] = []
+    let matchedPrinter: PrinterSummary | undefined
 
     console.info('[printer:main] Print request received', {
       requestedDeviceName: wanted || '(default)',
@@ -147,6 +171,7 @@ ipcMain.handle(
         }
 
         deviceName = match.name
+        matchedPrinter = summarizePrinters([match])[0]
         console.info('[printer:main] Matched printer', {
           requestedDeviceName: wanted,
           deviceName,
@@ -175,7 +200,7 @@ ipcMain.handle(
     const landscape = opts?.landscape ?? false
     const rotation = opts?.rotation ?? 0
 
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<PrintResult>((resolve, reject) => {
       const isRotated = rotation === 90 || rotation === 270
       const imgStyle = isRotated
         ? `
@@ -221,7 +246,6 @@ ipcMain.handle(
 
       const printWin = new BrowserWindow({
         show: false,
-        webPreferences: { offscreen: true },
       })
 
       let settled = false
@@ -234,6 +258,10 @@ ipcMain.handle(
 
       const closePrintWindow = () => {
         if (!printWin.isDestroyed()) printWin.close()
+      }
+
+      const closePrintWindowSoon = () => {
+        setTimeout(closePrintWindow, PRINT_WINDOW_CLOSE_DELAY_MS)
       }
 
       const loadTimeout = setTimeout(() => {
@@ -321,16 +349,27 @@ ipcMain.handle(
           },
           (success, failureReason) => {
             finish(() => {
-              closePrintWindow()
               if (success) {
-                console.info('[printer:main] Print job accepted by OS', {
+                const result: PrintResult = {
+                  acceptedByOS: true,
                   deviceName: deviceName || '(default)',
+                  requestedDeviceName: wanted || '(default)',
                   silent,
                   landscape,
                   rotation,
+                  pageSize: landscape ? '6x4' : '4x6',
+                  note:
+                    'Electron/Windows accepted the print job. This does not prove the physical printer completed it.',
+                  printer: matchedPrinter,
+                }
+                console.info('[printer:main] Print job accepted by OS', result)
+                console.info('[printer:main] Keeping hidden print window alive briefly for driver spool', {
+                  closeDelayMs: PRINT_WINDOW_CLOSE_DELAY_MS,
                 })
-                resolve()
+                closePrintWindowSoon()
+                resolve(result)
               } else {
+                closePrintWindow()
                 const message = failureReason || 'Print failed'
                 console.error('[printer:main] Print job failed', {
                   reason: message,
@@ -354,7 +393,7 @@ ipcMain.handle('printer:list', async (event) => {
   try {
     const printers = await win.webContents.getPrintersAsync()
     console.info('[printer:main] Printer list requested', summarizePrinters(printers))
-    return printers.map((p) => p.name)
+    return summarizePrinters(printers)
   } catch (e) {
     console.error('[printer:main] Failed to get printers:', e)
     return []
