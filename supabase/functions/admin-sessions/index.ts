@@ -161,8 +161,8 @@ Deno.serve(async (req) => {
     if (body.action === "update-settings") {
       const sessionPrice = body.sessionPrice;
       if (
-        !Number.isInteger(sessionPrice) || Number(sessionPrice) <= 0 ||
-        Number(sessionPrice) > 100_000_000
+        !Number.isInteger(sessionPrice) || Number(sessionPrice) < 1_000 ||
+        Number(sessionPrice) > 100_000_000 || Number(sessionPrice) % 1_000 !== 0
       ) {
         return jsonResponse({ error: "invalid_session_price" }, 400, req);
       }

@@ -25,7 +25,8 @@ export function AdminSettings() {
   }, [])
 
   const numericPrice = Number(price)
-  const valid = Number.isInteger(numericPrice) && numericPrice > 0 && numericPrice <= 100_000_000
+  const valid = Number.isInteger(numericPrice) && numericPrice >= 1_000 &&
+    numericPrice <= 100_000_000 && numericPrice % 1_000 === 0
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -63,7 +64,7 @@ export function AdminSettings() {
             <input
               id="session-price"
               type="number"
-              min="1"
+              min="1000"
               max="100000000"
               step="1000"
               value={price}
