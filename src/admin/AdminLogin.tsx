@@ -6,19 +6,26 @@ interface Props {
 }
 
 export function AdminLogin({ onSuccess }: Props) {
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
   const [shaking, setShaking] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (loginAdmin(password)) {
+    setLoading(true)
+    setError(null)
+    try {
+      await loginAdmin(email, password)
       onSuccess()
-    } else {
-      setError(true)
+    } catch (e) {
+      setError((e as Error).message)
       setShaking(true)
       setPassword('')
       setTimeout(() => setShaking(false), 500)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -62,6 +69,27 @@ export function AdminLogin({ onSuccess }: Props) {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label
+                htmlFor="admin-email"
+                className="block font-crt text-crt-cream/60 text-sm tracking-widest mb-2"
+              >
+                EMAIL
+              </label>
+              <input
+                id="admin-email"
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  setError(null)
+                }}
+                autoFocus
+                autoComplete="username"
+                className="w-full bg-black border-2 rounded-lg px-4 py-3 font-mono text-lg text-crt-phosphor border-crt-phosphor/40 focus:border-crt-phosphor outline-none"
+                style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
+              />
+            </div>
+            <div>
+              <label
                 htmlFor="admin-password"
                 className="block font-crt text-crt-cream/60 text-sm tracking-widest mb-2"
               >
@@ -73,9 +101,8 @@ export function AdminLogin({ onSuccess }: Props) {
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value)
-                  setError(false)
+                  setError(null)
                 }}
-                autoFocus
                 autoComplete="current-password"
                 placeholder="••••••••"
                 className={[
@@ -91,7 +118,7 @@ export function AdminLogin({ onSuccess }: Props) {
               />
               {error && (
                 <p className="font-crt text-crt-red text-base mt-2 tracking-wider">
-                  ✗ INCORRECT PASSWORD
+                  ✗ {error}
                 </p>
               )}
             </div>
@@ -99,7 +126,7 @@ export function AdminLogin({ onSuccess }: Props) {
             <button
               id="admin-login-btn"
               type="submit"
-              disabled={!password}
+              disabled={!email || !password || loading}
               className={[
                 'w-full py-3 rounded-lg font-pixel text-xs tracking-widest',
                 'transition-all duration-200',
@@ -110,7 +137,7 @@ export function AdminLogin({ onSuccess }: Props) {
                 'enabled:hover:shadow-[0_0_30px_rgba(57,255,20,0.7)]',
               ].join(' ')}
             >
-              ENTER
+              {loading ? 'CHECKING...' : 'ENTER'}
             </button>
           </form>
         </div>

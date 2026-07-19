@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { PrintMode } from '@/lib/strip-layout'
 
 export interface PlacedSticker {
   /** Instance id (unique per placement). */
@@ -16,10 +17,12 @@ export interface PlacedSticker {
 interface DecorationState {
   /** Paper/strip background color (hex). Customer-picked. */
   stripColor: string
+  printMode: PrintMode
   stickers: PlacedSticker[]
   selectedStickerId: string | null
 
   setStripColor: (color: string) => void
+  setPrintMode: (mode: PrintMode) => void
   addSticker: (assetId: string, x?: number, y?: number) => void
   moveSticker: (id: string, x: number, y: number) => void
   setStickerScale: (id: string, scale: number) => void
@@ -39,10 +42,12 @@ export const DEFAULT_STRIP_COLOR = '#224a34'
 
 export const useDecoration = create<DecorationState>((set) => ({
   stripColor: DEFAULT_STRIP_COLOR,
+  printMode: 'full-4x6',
   stickers: [],
   selectedStickerId: null,
 
   setStripColor: (stripColor) => set({ stripColor }),
+  setPrintMode: (printMode) => set({ printMode }),
 
   addSticker: (assetId, x, y) =>
     set((s) => ({
@@ -82,6 +87,7 @@ export const useDecoration = create<DecorationState>((set) => ({
   reset: () =>
     set({
       stripColor: DEFAULT_STRIP_COLOR,
+      printMode: 'full-4x6',
       stickers: [],
       selectedStickerId: null,
     }),

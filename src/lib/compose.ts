@@ -2,7 +2,13 @@ import { type TemplateId } from '@/config/app-config'
 import type { CapturedPhoto } from '@/state/session-store'
 import type { PlacedSticker } from '@/state/decoration-store'
 import { getSticker } from '@/lib/stickers'
-import { computePaperLayout, type PaperLayout, type Rect } from '@/lib/strip-layout'
+import {
+  computePaperLayout,
+  type PaperLayout,
+  type PhotoFrame,
+  type PrintMode,
+  type Rect,
+} from '@/lib/strip-layout'
 import type { Theme } from '@/themes'
 import qrCodeUrl from '@/asset/qrcode_euorna_profile.jpeg'
 
@@ -10,6 +16,7 @@ interface ComposeOpts {
   photos: CapturedPhoto[]
   template: TemplateId
   filterId: string
+  printMode: PrintMode
   theme: Theme
   decoration?: {
     /** Paper/strip background color. Falls back to theme paperBg when omitted. */
@@ -37,7 +44,7 @@ async function getQr(): Promise<HTMLImageElement> {
  * two identical copies side-by-side so customers can cut and share.
  */
 export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
-  const layout = computePaperLayout(opts.template)
+  const layout = computePaperLayout(opts.template, opts.printMode)
   const imgs = await Promise.all(opts.photos.map(loadImage))
 
   const canvas = document.createElement('canvas')
@@ -61,19 +68,6 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
     drawSectionFooter(ctx, section.footer, qr, opts.theme, paperBg)
   }
 
-  // Cut line for 2-up strips
-  if (layout.cutLine) {
-    ctx.save()
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)'
-    ctx.lineWidth = 1
-    ctx.setLineDash([8, 8])
-    ctx.beginPath()
-    ctx.moveTo(layout.cutLine.x, layout.cutLine.y1)
-    ctx.lineTo(layout.cutLine.x, layout.cutLine.y2)
-    ctx.stroke()
-    ctx.restore()
-  }
-
   // Placed stickers (paper-level, drawn once on top of everything)
   if (opts.decoration?.stickers?.length) {
     drawPlacedStickers(ctx, canvas.width, canvas.height, opts.decoration.stickers)
@@ -90,15 +84,14 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
 
 function drawSectionFrames(
   ctx: CanvasRenderingContext2D,
-  section: { frames: Rect[] },
+  section: { frames: PhotoFrame[] },
   imgs: HTMLImageElement[],
   opts: ComposeOpts,
 ) {
   const filterCss = opts.theme.filters.find((f) => f.id === opts.filterId)?.css ?? 'none'
   ctx.filter = filterCss
-  for (let i = 0; i < section.frames.length; i++) {
-    const f = section.frames[i]
-    const img = imgs[i]
+  for (const f of section.frames) {
+    const img = imgs[f.photoIndex]
     if (!img) continue
     drawCover(ctx, img, f.x, f.y, f.w, f.h)
   }

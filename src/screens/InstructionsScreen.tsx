@@ -1,27 +1,34 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ChannelBar } from '@/components/ChannelBar'
 import { TVButton } from '@/components/TVButton'
 import { useSession } from '@/state/session-store'
+import { dbUpdateSession } from '@/lib/supabase/sessions'
 
 const READ_SECONDS = 20
 
 export function InstructionsScreen() {
   const goTo = useSession((s) => s.goTo)
+  const sessionId = useSession((s) => s.sessionId)
   const [remaining, setRemaining] = useState(READ_SECONDS)
+
+  const beginCapture = useCallback(() => {
+    if (sessionId) void dbUpdateSession(sessionId, { status: 'capturing' })
+    goTo('capture')
+  }, [goTo, sessionId])
 
   useEffect(() => {
     const t = setInterval(() => {
       setRemaining((r) => {
         if (r <= 1) {
           clearInterval(t)
-          goTo('filter')
+          beginCapture()
           return 0
         }
         return r - 1
       })
     }, 1000)
     return () => clearInterval(t)
-  }, [goTo])
+  }, [beginCapture])
 
   return (
     <div className="absolute inset-0 grid grid-rows-[auto_1fr]">
@@ -55,7 +62,7 @@ export function InstructionsScreen() {
             <div className="font-pixel text-6xl text-crt-amber tabular-nums">
               {String(remaining).padStart(2, '0')}
             </div>
-            <TVButton variant="primary" size="lg" onClick={() => goTo('filter')}>
+            <TVButton variant="primary" size="lg" onClick={beginCapture}>
               SAYA SIAP ▶
             </TVButton>
           </div>

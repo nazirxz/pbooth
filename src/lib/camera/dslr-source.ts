@@ -1,6 +1,7 @@
 import { appConfig } from '@/config/app-config'
 import { DigiCamClient } from './digicam-client'
 import { WebcamSource } from './webcam-source'
+import { rotateBlobIfNeeded } from './rotate-blob'
 import type { CameraSource } from './types'
 
 /**
@@ -83,9 +84,11 @@ export class DslrSource implements CameraSource {
   }
 
   async capture(videoEl: HTMLVideoElement): Promise<Blob> {
+    const rotation = appConfig.camera.captureRotation
     if (!this.apiReady) {
       console.warn('[camera/dslr] API unavailable, using preview snapshot fallback')
-      return this.preview.capture(videoEl)
+      const raw = await this.preview.capture(videoEl)
+      return rotateBlobIfNeeded(raw, rotation)
     }
 
     const previousPath = this.lastCapturedPath
@@ -101,14 +104,15 @@ export class DslrSource implements CameraSource {
         appConfig.camera.dslr.captureTimeoutMs,
       )
       this.lastCapturedPath = path
-      const blob = await this.client.downloadImage(path)
+      const raw = await this.client.downloadImage(path)
       console.info('[camera/dslr] tether capture complete', {
         path,
         previousPath,
-        blobBytes: blob.size,
-        blobType: blob.type || '(unknown)',
+        blobBytes: raw.size,
+        blobType: raw.type || '(unknown)',
+        captureRotation: rotation,
       })
-      return blob
+      return rotateBlobIfNeeded(raw, rotation)
     } catch (e) {
       if (appConfig.camera.dslr.fallbackToWebcam) {
         console.warn('[camera/dslr] tether capture failed, falling back to preview snapshot', {
@@ -116,7 +120,8 @@ export class DslrSource implements CameraSource {
           lastCapturedPath: this.lastCapturedPath,
           error: e instanceof Error ? e.message : String(e),
         }, e)
-        return this.preview.capture(videoEl)
+        const raw = await this.preview.capture(videoEl)
+        return rotateBlobIfNeeded(raw, rotation)
       }
       console.error('[camera/dslr] tether capture failed and fallback is disabled', {
         previousPath,

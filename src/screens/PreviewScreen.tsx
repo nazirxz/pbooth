@@ -26,6 +26,7 @@ export function PreviewScreen() {
   const template = useSession((s) => s.template)
   const filter = useSession((s) => s.filter)
   const sessionId = useSession((s) => s.sessionId)
+  const shareToken = useSession((s) => s.shareToken)
   const composed = useSession((s) => s.composed)
   const setComposed = useSession((s) => s.setComposed)
   const liveAsset = useSession((s) => s.liveAsset)
@@ -34,6 +35,7 @@ export function PreviewScreen() {
   const startPreviewCountdown = useSession((s) => s.startPreviewCountdown)
   const theme = useTheme((s) => s.theme)
   const stripColor = useDecoration((s) => s.stripColor)
+  const printMode = useDecoration((s) => s.printMode)
   const placedStickers = useDecoration((s) => s.stickers)
 
   const [qrImg, setQrImg] = useState<string>('')
@@ -72,9 +74,9 @@ export function PreviewScreen() {
   // status. The share page works the moment the row + photos hit Supabase,
   // and re-fetches itself if the user reloads, so customers can scan early.
   useEffect(() => {
-    if (!sessionId) return
+    if (!sessionId || !shareToken) return
     const base = appConfig.share.baseUrl || window.location.origin
-    const url = `${base}/s/${sessionId}`
+    const url = `${base}/s/${sessionId}?t=${encodeURIComponent(shareToken)}`
     let cancelled = false
     QRCode.toDataURL(url, {
       width: 320,
@@ -88,7 +90,7 @@ export function PreviewScreen() {
     return () => {
       cancelled = true
     }
-  }, [sessionId])
+  }, [sessionId, shareToken])
 
   // Compose strip + upload + build the GIF live photo from the captured stills
   useEffect(() => {
@@ -102,6 +104,7 @@ export function PreviewScreen() {
           photos,
           template,
           filterId: filter,
+          printMode,
           theme,
           decoration: { stripColor, stickers: placedStickers },
         })
@@ -109,17 +112,24 @@ export function PreviewScreen() {
         const dataUrl = await blobToDataUrl(blob)
 
         setUploadState('uploading')
-        const publicUrl = sessionId ? await uploadComposed(sessionId, blob) : null
+        const publicUrl = sessionId && shareToken
+          ? await uploadComposed(sessionId, blob, shareToken)
+          : null
         if (cancelled) return
 
         setComposed({ blob, dataUrl, publicUrl })
 
-        if (publicUrl && sessionId) {
-          await dbUpdateSession(sessionId, {
-            final_image_url: publicUrl,
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-          })
+        if (publicUrl && sessionId && shareToken) {
+          if (appConfig.storage.backend === 'supabase') {
+            await dbUpdateSession(sessionId, {
+              final_image_url: publicUrl,
+              final_storage_backend: 'supabase',
+              final_storage_path: `${sessionId}/final.jpg`,
+              final_expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+            })
+          }
           setUploadState('uploaded')
 
           // GIF is normally already encoded in the background by DecorateScreen
@@ -128,33 +138,41 @@ export function PreviewScreen() {
           setLiveError(null)
           void (async () => {
             try {
-              let video = liveAsset
+              let video = liveAsset?.filterId === filter ? liveAsset : null
               if (!video) {
                 setLiveState('encoding')
                 const filterCss = theme.filters.find((f) => f.id === filter)?.css ?? 'none'
-                video = await buildVideoFromPhotos({
+                const encoded = await buildVideoFromPhotos({
                   photos,
                   width: 1280,
                   frameDelayMs: 500,
                   loopCount: 3,
                   filterCss,
                 })
+                video = { ...encoded, filterId: filter }
                 if (cancelled) return
                 setLiveAsset(video)
               }
 
               setLiveState('uploading')
-              const liveUrl = await uploadLiveAsset(sessionId, video.blob, video.ext)
+              const liveUrl = await uploadLiveAsset(sessionId, video.blob, video.ext, shareToken)
               if (!liveUrl) {
                 setLiveState('error')
                 setLiveError('upload failed (cek bucket "composed" + storage policy)')
                 return
               }
-              const res = await dbUpdateSession(sessionId, { live_video_url: liveUrl })
-              if (!res.ok) {
-                setLiveState('error')
-                setLiveError(res.error ?? 'db update failed')
-                return
+              if (appConfig.storage.backend === 'supabase') {
+                const res = await dbUpdateSession(sessionId, {
+                  live_video_url: liveUrl,
+                  live_storage_backend: 'supabase',
+                  live_storage_path: `${sessionId}/live.${video.ext}`,
+                  live_expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+                })
+                if (!res.ok) {
+                  setLiveState('error')
+                  setLiveError(res.error ?? 'db update failed')
+                  return
+                }
               }
               setLiveState('ready')
             } catch (e) {
@@ -175,7 +193,7 @@ export function PreviewScreen() {
     return () => {
       cancelled = true
     }
-  }, [composed, photos, template, filter, sessionId, setComposed, theme, stripColor, placedStickers, liveAsset, setLiveAsset])
+  }, [composed, photos, template, filter, printMode, sessionId, shareToken, setComposed, theme, stripColor, placedStickers, liveAsset, setLiveAsset])
 
   const handlePrint = async () => {
     if (!composed) {
@@ -191,7 +209,10 @@ export function PreviewScreen() {
     }
 
     const printOptions = {
-      deviceName: appConfig.printer.deviceName,
+      deviceName:
+        printMode === 'cut-2x6'
+          ? appConfig.printer.cutDeviceName
+          : appConfig.printer.fullDeviceName,
       silent: appConfig.printer.silent,
       landscape: appConfig.printer.landscape,
       rotation: appConfig.printer.rotation,
@@ -200,6 +221,7 @@ export function PreviewScreen() {
     console.info('[printer] Print requested from preview screen:', {
       sessionId,
       template,
+      printMode,
       options: printOptions,
       blobBytes: composed.blob.size,
       dataUrl: summarizeDataUrl(composed.dataUrl),
@@ -239,6 +261,9 @@ export function PreviewScreen() {
 
         <div className="flex flex-col gap-6 justify-center min-w-0">
           <div className="font-pixel text-5xl text-crt-phosphor rgb-split leading-tight">YOUR STRIP</div>
+          <div className="font-crt text-xl text-crt-cream tracking-widest -mt-3">
+            {printMode === 'cut-2x6' ? 'CUT 2X6 · 2 PIECES' : 'FULL 4X6 · NO CUT'}
+          </div>
           <div className="font-crt text-2xl text-crt-amber/90 tracking-widest animate-blink">
             ● WAITING FOR YOUR PHOTO
           </div>

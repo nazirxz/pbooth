@@ -17,3 +17,21 @@ verify_jwt = false
 
 [functions.dev-simulate-paid]
 verify_jwt = true
+
+[functions.r2-sign-upload]
+verify_jwt = true
+
+[functions.r2-complete-upload]
+verify_jwt = true
+
+[functions.shared-session]
+verify_jwt = false
+
+[functions.cleanup-expired-assets]
+verify_jwt = false
+
+[functions.cleanup-expired-sessions]
+verify_jwt = false
+
+[functions.admin-sessions]
+verify_jwt = true

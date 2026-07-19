@@ -138,17 +138,21 @@ export class DigiCamClient {
         const res = await fetch(url, { signal: ctrl.signal })
         if (!res.ok) throw new Error(`digiCamControl image ${filename}: HTTP ${res.status}`)
         const blob = await res.blob()
-        if (blob.size > 0) {
+        const validatedBlob = await validateDownloadedImage(blob, filename)
+        if (validatedBlob) {
           console.info('[digicam] image downloaded successfully', {
             filename,
-            blobBytes: blob.size,
-            blobType: blob.type || '(unknown)',
+            blobBytes: validatedBlob.size,
+            blobType: validatedBlob.type,
             attempt,
           })
           clearTimeout(t)
-          return blob
+          return validatedBlob
         }
-        throw new Error(`digiCamControl image ${filename}: empty response blob`)
+        throw new Error(
+          `digiCamControl image ${filename}: response is empty, incomplete, or not a supported image ` +
+            `(bytes=${blob.size}, type=${blob.type || '(unknown)'})`,
+        )
       } catch (e) {
         lastError = e instanceof Error ? e : new Error(String(e))
         console.warn(`[digicam] download image attempt ${attempt}/${maxRetries} failed`, {
@@ -220,6 +224,36 @@ export class DigiCamClient {
   }
 }
 
+/**
+ * digiCamControl can briefly return an empty/partial file (or an HTML response
+ * with HTTP 200) while the camera is still writing the JPEG. Verify the file
+ * signature and JPEG end marker before allowing the review screen to decode it.
+ */
+async function validateDownloadedImage(blob: Blob, filename: string): Promise<Blob | null> {
+  if (blob.size < 12) return null
+
+  const head = new Uint8Array(await blob.slice(0, 12).arrayBuffer())
+  const isJpeg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff
+  if (isJpeg) {
+    const tail = new Uint8Array(await blob.slice(-2).arrayBuffer())
+    if (tail[0] !== 0xff || tail[1] !== 0xd9) return null
+    return blob.type === 'image/jpeg' ? blob : blob.slice(0, blob.size, 'image/jpeg')
+  }
+
+  const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+  const isPng = pngSignature.every((byte, index) => head[index] === byte)
+  if (isPng) {
+    return blob.type === 'image/png' ? blob : blob.slice(0, blob.size, 'image/png')
+  }
+
+  console.warn('[digicam] downloaded response has no supported image signature', {
+    filename,
+    blobBytes: blob.size,
+    blobType: blob.type || '(unknown)',
+  })
+  return null
+}
+
 function wait(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms))
 }
@@ -237,4 +271,3 @@ function isValidCapturePath(path: string): boolean {
   // Must contain a file extension (dot followed by at least one char)
   return /\.\w+$/.test(path.split(/[\\/]/).pop() ?? '')
 }
-

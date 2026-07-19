@@ -7,7 +7,7 @@ export function getSupabase(): SupabaseClient | null {
   if (!appConfig.supabase.url || !appConfig.supabase.anonKey) return null
   if (!client) {
     client = createClient(appConfig.supabase.url, appConfig.supabase.anonKey, {
-      auth: { persistSession: false },
+      auth: { persistSession: true, autoRefreshToken: true },
       realtime: { params: { eventsPerSecond: 5 } },
     })
   }

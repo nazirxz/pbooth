@@ -9,6 +9,7 @@ import type { PaymentSession, PaymentStatus } from '@/lib/payment'
 import { useSession } from '@/state/session-store'
 import { dbCreateSession, dbUpdateSession } from '@/lib/supabase/sessions'
 import { dbCreatePayment, dbUpdatePaymentStatus } from '@/lib/supabase/payments'
+import { createShareCredentials } from '@/lib/share-token'
 
 type MethodView = 'qris' | 'other'
 
@@ -16,6 +17,7 @@ export function PaymentScreen() {
   const goTo = useSession((s) => s.goTo)
   const setPayment = useSession((s) => s.setPayment)
   const setSessionId = useSession((s) => s.setSessionId)
+  const setShareToken = useSession((s) => s.setShareToken)
   const setPaymentRowId = useSession((s) => s.setPaymentRowId)
   const markPaid = useSession((s) => s.markPaid)
 
@@ -36,10 +38,12 @@ export function PaymentScreen() {
 
     ;(async () => {
       try {
-        const row = await dbCreateSession()
+        const share = await createShareCredentials()
+        const row = await dbCreateSession(share.hash)
         if (!mounted) return
         sessionIdRef.current = row?.id ?? null
         setSessionId(row?.id ?? null)
+        setShareToken(row ? share.token : null)
 
         const pay = await provider.createSession(appConfig.payment.amount, {
           sessionId: row?.id ?? null,
@@ -96,7 +100,7 @@ export function PaymentScreen() {
       mounted = false
       unsubRef.current?.()
     }
-  }, [goTo, setPayment, setSessionId, setPaymentRowId, markPaid])
+  }, [goTo, setPayment, setSessionId, setShareToken, setPaymentRowId, markPaid])
 
   // ── 2. (re)render QR whenever session or active tab changes ─────────────
   useEffect(() => {

@@ -174,5 +174,13 @@ body::-webkit-scrollbar { display: none; }
   50% { opacity: 1; transform: scale(1.1) rotate(180deg); }
 }
 
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
 .animate-blink { animation: blink 1s step-end infinite; }
 

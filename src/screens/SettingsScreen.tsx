@@ -5,6 +5,9 @@ import { TVButton } from '@/components/TVButton'
 import { useSession } from '@/state/session-store'
 import { useDevice } from '@/state/device-store'
 
+const EXIT_PIN = '2206'
+const PIN_LENGTH = 4
+
 export function SettingsScreen() {
   const goTo = useSession((s) => s.goTo)
   const selectedDeviceId = useDevice((s) => s.selectedDeviceId)
@@ -15,6 +18,41 @@ export function SettingsScreen() {
   const [activeId, setActiveId] = useState<string | null>(selectedDeviceId)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+
+  const [showExitModal, setShowExitModal] = useState(false)
+  const [pin, setPin] = useState('')
+  const [pinError, setPinError] = useState(false)
+
+  const handlePinDigit = (digit: string) => {
+    if (pinError) return // ignore taps during error flash
+    const next = pin + digit
+    if (next.length < PIN_LENGTH) {
+      setPin(next)
+      return
+    }
+    // Full PIN entered — check immediately
+    if (next === EXIT_PIN) {
+      setPinError(false)
+      window.pbooth?.quit?.()
+    } else {
+      setPinError(true)
+      setTimeout(() => {
+        setPinError(false)
+        setPin('')
+      }, 600)
+    }
+  }
+
+  const handlePinBackspace = () => {
+    if (pinError) return
+    setPin((p) => p.slice(0, -1))
+  }
+
+  const handleCloseExitModal = () => {
+    setShowExitModal(false)
+    setPin('')
+    setPinError(false)
+  }
 
   // Permission + initial enumerate
   useEffect(() => {
@@ -98,6 +136,15 @@ export function SettingsScreen() {
     <div className="absolute inset-0 grid grid-rows-[auto_1fr]">
       <ChannelBar channel="00" label="SETTINGS" />
 
+      {/* Exit icon — top-right corner */}
+      <button
+        onClick={() => setShowExitModal(true)}
+        aria-label="Exit application"
+        className="absolute top-3 right-4 z-10 w-11 h-11 rounded-full border-2 border-crt-red/40 bg-black/60 text-crt-red/60 hover:text-crt-red hover:border-crt-red hover:bg-black/80 transition-colors flex items-center justify-center text-xl touch-press"
+      >
+        ⏻
+      </button>
+
       <div className="grid grid-cols-[1fr_360px] gap-6 px-10 pb-4 min-h-0">
         <div className="grid grid-rows-[auto_1fr_auto] gap-3 min-h-0">
           <div className="font-pixel text-3xl text-crt-phosphor rgb-split">CAMERA SETUP</div>
@@ -178,6 +225,81 @@ export function SettingsScreen() {
           </div>
         </div>
       </div>
+
+      {/* ── PIN exit modal ── */}
+      {showExitModal && (
+        <div className="absolute inset-0 bg-black/85 flex items-center justify-center z-50">
+          <div className="w-[380px] border-4 border-crt-red bg-black/95 rounded-2xl flex flex-col items-center gap-5 p-8 shadow-[0_0_40px_rgba(255,59,48,0.3)]">
+            {/* Title */}
+            <div className="font-pixel text-2xl text-crt-red text-center rgb-split">
+              EXIT KIOSK
+            </div>
+            <div className="font-crt text-lg text-crt-cream/70 text-center tracking-widest">
+              MASUKKAN PIN ADMIN
+            </div>
+
+            {/* PIN dots */}
+            <div
+              className={clsx(
+                'flex gap-4 justify-center transition-transform',
+                pinError && 'animate-[shake_0.4s_ease-in-out]',
+              )}
+            >
+              {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+                <div
+                  key={i}
+                  className={clsx(
+                    'w-5 h-5 rounded-full border-2 transition-colors',
+                    pinError
+                      ? 'border-crt-red bg-crt-red'
+                      : i < pin.length
+                        ? 'border-crt-phosphor bg-crt-phosphor'
+                        : 'border-crt-cream/40 bg-transparent',
+                  )}
+                />
+              ))}
+            </div>
+
+            {pinError && (
+              <div className="font-crt text-base text-crt-red tracking-widest -mt-2">
+                PIN SALAH!
+              </div>
+            )}
+
+            {/* Number pad */}
+            <div className="grid grid-cols-3 gap-3 w-full">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => handlePinDigit(d)}
+                  className="touch-press aspect-square rounded-xl border-2 border-crt-cream/30 bg-black/60 font-crt text-3xl text-crt-cream hover:border-crt-cream/60 hover:bg-black/40 transition-colors"
+                >
+                  {d}
+                </button>
+              ))}
+              {/* Bottom row: Cancel · 0 · Backspace */}
+              <button
+                onClick={handleCloseExitModal}
+                className="touch-press aspect-square rounded-xl border-2 border-crt-red/40 bg-black/60 font-crt text-lg text-crt-red hover:border-crt-red hover:bg-crt-red/10 transition-colors"
+              >
+                ✕
+              </button>
+              <button
+                onClick={() => handlePinDigit('0')}
+                className="touch-press aspect-square rounded-xl border-2 border-crt-cream/30 bg-black/60 font-crt text-3xl text-crt-cream hover:border-crt-cream/60 hover:bg-black/40 transition-colors"
+              >
+                0
+              </button>
+              <button
+                onClick={handlePinBackspace}
+                className="touch-press aspect-square rounded-xl border-2 border-crt-amber/40 bg-black/60 font-crt text-lg text-crt-amber hover:border-crt-amber hover:bg-crt-amber/10 transition-colors"
+              >
+                ⌫
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
