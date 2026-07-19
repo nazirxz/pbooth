@@ -46,16 +46,16 @@ the Cloudflare dashboard before enabling R2 in the kiosk build.
 
 ## 2. Configure bucket CORS
 
-Add the production share origin and development origin. Replace the production
-domain if it changes:
+The packaged Electron app is loaded from `file://`, which Chromium represents
+as an opaque (`null`) origin. Use a wildcard origin so its presigned requests
+pass preflight as well as requests from the web share page and local Vite. This
+does not make the bucket public: every request still needs a short-lived,
+single-object presigned URL.
 
 ```json
 [
   {
-    "AllowedOrigins": [
-      "https://pbooth.vercel.app",
-      "http://localhost:5173"
-    ],
+    "AllowedOrigins": ["*"],
     "AllowedMethods": ["GET", "HEAD", "PUT"],
     "AllowedHeaders": ["content-type"],
     "ExposeHeaders": ["etag"],
@@ -63,6 +63,8 @@ domain if it changes:
   }
 ]
 ```
+
+Keep **Public Development URL** and public custom-domain access disabled.
 
 The browser receives only five-minute presigned PUT URLs and fifteen-minute
 presigned GET URLs. R2 API credentials never enter the renderer.
