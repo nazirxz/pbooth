@@ -6,7 +6,7 @@ import type { AdminStats } from '@/lib/supabase/payments'
 
 export type { AdminPhotoRow }
 
-async function adminRequest<T>(body: Record<string, unknown>): Promise<T> {
+export async function adminRequest<T>(body: Record<string, unknown>): Promise<T> {
   const sb = getSupabase()
   if (!sb || !appConfig.supabase.url || !appConfig.supabase.anonKey) {
     throw new Error('Supabase belum dikonfigurasi')
@@ -25,6 +25,20 @@ async function adminRequest<T>(body: Record<string, unknown>): Promise<T> {
   const result = await response.json().catch(() => ({})) as T & { error?: string }
   if (!response.ok) throw new Error(result.error ?? `Admin request gagal (${response.status})`)
   return result
+}
+
+export interface AdminSettingsData {
+  session_price: number
+  currency: 'IDR'
+  updated_at: string
+}
+
+export function getAdminSettings(): Promise<AdminSettingsData> {
+  return adminRequest<AdminSettingsData>({ action: 'get-settings' })
+}
+
+export function updateAdminSettings(sessionPrice: number): Promise<AdminSettingsData> {
+  return adminRequest<AdminSettingsData>({ action: 'update-settings', sessionPrice })
 }
 
 export async function checkAdminAuth(): Promise<boolean> {

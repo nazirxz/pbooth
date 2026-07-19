@@ -588,9 +588,8 @@ function StickerNode({
         left: `${sticker.x * 100}%`,
         top: `${sticker.y * 100}%`,
         transform: `translate(-50%, -50%) rotate(${sticker.rotation}rad)`,
-        fontSize: `${sizePx}px`,
-        lineHeight: 1,
-        color: def.color,
+        width: `${sizePx}px`,
+        height: `${sizePx}px`,
         cursor: 'grab',
         textShadow: selected ? '0 0 14px rgba(255,255,255,0.9)' : 'none',
         filter: selected ? 'drop-shadow(0 0 8px rgba(255,255,255,0.7))' : 'none',
@@ -600,7 +599,7 @@ function StickerNode({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
     >
-      {def.glyph}
+      <img src={def.src} alt={def.name} draggable={false} className="w-full h-full object-contain pointer-events-none" />
       {selected && (
         <div
           className="absolute -top-8 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/85 rounded-full px-2 py-1 text-white text-sm font-crt tracking-wider"
@@ -744,10 +743,9 @@ function StickerGrid({ onPick }: { onPick: (assetId: string) => void }) {
           key={s.id}
           onClick={() => onPick(s.id)}
           className="touch-press aspect-square bg-black/40 border-2 border-crt-cream/30 rounded-xl flex items-center justify-center"
-          style={{ color: s.color }}
           title={s.name}
         >
-          <span style={{ fontSize: 36, lineHeight: 1 }}>{s.glyph}</span>
+          <img src={s.src} alt={s.name} loading="lazy" draggable={false} className="w-[82%] h-[82%] object-contain" />
         </button>
       ))}
     </div>

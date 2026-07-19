@@ -3,10 +3,11 @@ import { AdminLogin } from './AdminLogin'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminGallery } from './AdminGallery'
 import { AdminSessionDetail } from './AdminSessionDetail'
+import { AdminSettings } from './AdminSettings'
 import { checkAdminAuth, logoutAdmin, adminConfigured } from './admin-data'
 import type { AdminSessionRow } from '@/lib/supabase/sessions'
 
-type View = 'dashboard' | 'gallery'
+type View = 'dashboard' | 'gallery' | 'settings'
 
 export function AdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null)
@@ -75,7 +76,7 @@ export function AdminPage() {
 
           {/* Nav tabs */}
           <nav className="flex items-center gap-1">
-            {(['gallery', 'dashboard'] as const).map((v) => (
+            {(['gallery', 'dashboard', 'settings'] as const).map((v) => (
               <button
                 key={v}
                 id={`admin-nav-${v}`}
@@ -108,6 +109,8 @@ export function AdminPage() {
       {/* Content */}
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-8 space-y-10">
         {view === 'dashboard' && <AdminDashboard />}
+
+        {view === 'settings' && <AdminSettings />}
 
         {view === 'gallery' && (
           <AdminGallery

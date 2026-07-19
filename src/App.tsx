@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CRTFrame } from '@/components/CRTFrame'
 import { SessionTimer } from '@/components/SessionTimer'
@@ -11,10 +12,13 @@ import { CaptureScreen } from '@/screens/CaptureScreen'
 import { DecorateScreen } from '@/screens/DecorateScreen'
 import { PreviewScreen } from '@/screens/PreviewScreen'
 import { SettingsScreen } from '@/screens/SettingsScreen'
+import { startRuntimeConfigSync } from '@/state/runtime-config-store'
 
 export default function App() {
   const screen = useSession((s) => s.screen)
   const usesFrame = screen !== 'boot'
+
+  useEffect(() => startRuntimeConfigSync(), [])
 
   return (
     <div className="kiosk-frame">

@@ -19,6 +19,7 @@ import type { PaymentProvider, PaymentSession, PaymentStatus } from './types'
 
 interface CreateResponse {
   paymentId: string
+  amount: number
   invoiceNumber: string
   /** Raw QRIS EMV string — render directly as QR. Null if DOKU did not return one. */
   qrString: string | null
@@ -101,7 +102,7 @@ export const qrisPaymentProvider: PaymentProvider = {
     return {
       id: data.paymentId,
       paymentRowId: data.paymentId,
-      amount,
+      amount: data.amount,
       currency: appConfig.payment.currency,
       qrString,
       status: 'pending',

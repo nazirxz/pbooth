@@ -1,7 +1,9 @@
 // POST /functions/v1/create-doku-payment
 //
-// Body:  { amount: number, sessionId?: string | null }
-// Returns: { paymentId, invoiceNumber, paymentUrl, expiresAt }
+// Body:  { amount?: number, sessionId?: string | null }
+// Returns: { paymentId, amount, invoiceNumber, paymentUrl, expiresAt }
+// The request amount is only a client hint; the billed amount always comes
+// from public.app_settings.
 //
 // Flow:
 //   1. Generate invoice_number locally
@@ -27,7 +29,8 @@ import {
 const REQUEST_TARGET = "/checkout/v1/payment";
 
 interface CreatePaymentRequest {
-  amount: number;
+  /** Display hint from the kiosk. The server always uses app_settings.session_price. */
+  amount?: number;
   sessionId?: string | null;
   /** Optional override — defaults to env DOKU_DEFAULT_PAYMENT_DUE_MIN. */
   paymentDueMinutes?: number;
@@ -80,16 +83,27 @@ Deno.serve(async (req) => {
   } catch {
     return jsonResponse({ error: "invalid_json" }, { status: 400, req });
   }
-  if (!Number.isFinite(input.amount) || input.amount <= 0) {
-    return jsonResponse(
-      { error: "invalid_amount" },
-      { status: 400, req },
-    );
-  }
-
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   });
+
+  // The kiosk is an untrusted client. Resolve the billable amount server-side
+  // so a modified request cannot create a cheaper DOKU payment.
+  const { data: settings, error: settingsErr } = await sb
+    .from("app_settings")
+    .select("session_price,currency")
+    .eq("key", "global")
+    .single();
+  if (
+    settingsErr || !settings || !Number.isInteger(settings.session_price) ||
+    settings.session_price <= 0
+  ) {
+    return jsonResponse(
+      { error: "payment_settings_unavailable", detail: settingsErr?.message },
+      { status: 503, req },
+    );
+  }
+  const amount = settings.session_price as number;
 
   const invoiceNumber = `PBOOTH-${Date.now()}-${
     Math.random().toString(36).slice(2, 8).toUpperCase()
@@ -105,7 +119,7 @@ Deno.serve(async (req) => {
       provider: "doku",
       provider_ref: invoiceNumber,
       invoice_number: invoiceNumber,
-      amount: input.amount,
+      amount,
       status: "pending",
       qr_string: null,
       expires_at: expiresAt.toISOString(),
@@ -147,7 +161,7 @@ Deno.serve(async (req) => {
 
   const requestBody = {
     order: {
-      amount: input.amount,
+      amount,
       invoice_number: invoiceNumber,
       currency: "IDR",
       callback_url: CALLBACK_URL || undefined,
@@ -156,7 +170,7 @@ Deno.serve(async (req) => {
       line_items: [
         {
           name: "Pbooth Photo Session",
-          price: input.amount,
+          price: amount,
           quantity: 1,
         },
       ],
@@ -310,6 +324,7 @@ Deno.serve(async (req) => {
   return jsonResponse(
     {
       paymentId: paymentRow.id,
+      amount,
       invoiceNumber,
       // Raw QRIS EMV string when DOKU returned one; null otherwise.
       qrString: qrisString,

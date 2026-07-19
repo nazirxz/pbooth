@@ -3,10 +3,12 @@ import { ChannelBar } from '@/components/ChannelBar'
 import { TVButton } from '@/components/TVButton'
 import { Logo } from '@/components/Logo'
 import { useSession } from '@/state/session-store'
+import { useRuntimeConfig } from '@/state/runtime-config-store'
 import { appConfig } from '@/config/app-config'
 
 export function HomeScreen() {
   const goTo = useSession((s) => s.goTo)
+  const sessionPrice = useRuntimeConfig((s) => s.sessionPrice)
   const start = () => goTo(appConfig.payment.enabled ? 'payment' : 'instructions')
 
   return (
@@ -28,7 +30,7 @@ export function HomeScreen() {
           </div>
           <div className="mt-6 font-crt text-2xl text-crt-amber/90 tracking-widest">
             {appConfig.payment.enabled
-              ? `RP ${appConfig.payment.amount.toLocaleString('id-ID')} / SESSION`
+              ? `RP ${sessionPrice.toLocaleString('id-ID')} / SESSION`
               : 'FREE MODE'}
           </div>
         </motion.div>
