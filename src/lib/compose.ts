@@ -46,6 +46,7 @@ async function getQr(): Promise<HTMLImageElement> {
 export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
   const layout = computePaperLayout(opts.template, opts.printMode)
   const imgs = await Promise.all(opts.photos.map(loadImage))
+  const stickerImages = await loadStickerImages(opts.decoration?.stickers ?? [])
 
   const canvas = document.createElement('canvas')
   canvas.width = layout.paper.w
@@ -70,7 +71,7 @@ export async function composeStrip(opts: ComposeOpts): Promise<Blob> {
 
   // Placed stickers (paper-level, drawn once on top of everything)
   if (opts.decoration?.stickers?.length) {
-    drawPlacedStickers(ctx, canvas.width, canvas.height, opts.decoration.stickers)
+    drawPlacedStickers(ctx, canvas.width, canvas.height, opts.decoration.stickers, stickerImages)
   }
 
   if (opts.theme.compose.scanlineOverlay) {
@@ -215,25 +216,41 @@ function drawPlacedStickers(
   canvasW: number,
   canvasH: number,
   stickers: PlacedSticker[],
+  images: Map<string, HTMLImageElement>,
 ) {
-  ctx.save()
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
   for (const s of stickers) {
     const def = getSticker(s.assetId)
-    if (!def) continue
-    const basePx = 92 * s.scale
+    const img = def ? images.get(def.id) : undefined
+    if (!img) continue
+    const maxSize = 120 * s.scale
+    const ratio = img.naturalWidth / img.naturalHeight
+    const width = ratio >= 1 ? maxSize : maxSize * ratio
+    const height = ratio >= 1 ? maxSize / ratio : maxSize
     const px = s.x * canvasW
     const py = s.y * canvasH
     ctx.save()
     ctx.translate(px, py)
     ctx.rotate(s.rotation)
-    ctx.font = `bold ${basePx}px "Fredoka", "Apple Color Emoji", "Segoe UI Emoji", sans-serif`
-    if (def.color) ctx.fillStyle = def.color
-    ctx.fillText(def.glyph, 0, 0)
+    ctx.drawImage(img, -width / 2, -height / 2, width, height)
     ctx.restore()
   }
-  ctx.restore()
+}
+
+async function loadStickerImages(stickers: PlacedSticker[]): Promise<Map<string, HTMLImageElement>> {
+  const defs = [...new Set(stickers.map((sticker) => sticker.assetId))]
+    .map(getSticker)
+    .filter((def): def is NonNullable<typeof def> => Boolean(def))
+  const loaded = await Promise.all(defs.map(async (def) => [def.id, await loadImageUrl(def.src)] as const))
+  return new Map(loaded)
+}
+
+function loadImageUrl(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = src
+  })
 }
 
 function clamp(v: number) {

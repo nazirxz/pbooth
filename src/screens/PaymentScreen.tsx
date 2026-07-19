@@ -9,11 +9,14 @@ import type { PaymentSession, PaymentStatus } from '@/lib/payment'
 import { useSession } from '@/state/session-store'
 import { dbCreateSession, dbUpdateSession } from '@/lib/supabase/sessions'
 import { dbCreatePayment, dbUpdatePaymentStatus } from '@/lib/supabase/payments'
+import { useRuntimeConfig } from '@/state/runtime-config-store'
 import { createShareCredentials } from '@/lib/share-token'
 
 type MethodView = 'qris' | 'other'
 
 export function PaymentScreen() {
+  // Snapshot once on mount. A later admin update applies to the next payment.
+  const [requestedAmount] = useState(() => useRuntimeConfig.getState().sessionPrice)
   const goTo = useSession((s) => s.goTo)
   const setPayment = useSession((s) => s.setPayment)
   const setSessionId = useSession((s) => s.setSessionId)
@@ -45,7 +48,7 @@ export function PaymentScreen() {
         setSessionId(row?.id ?? null)
         setShareToken(row ? share.token : null)
 
-        const pay = await provider.createSession(appConfig.payment.amount, {
+        const pay = await provider.createSession(requestedAmount, {
           sessionId: row?.id ?? null,
         })
         if (!mounted) return
@@ -100,7 +103,7 @@ export function PaymentScreen() {
       mounted = false
       unsubRef.current?.()
     }
-  }, [goTo, setPayment, setSessionId, setShareToken, setPaymentRowId, markPaid])
+  }, [goTo, setPayment, setSessionId, setShareToken, setPaymentRowId, markPaid, requestedAmount])
 
   // ── 2. (re)render QR whenever session or active tab changes ─────────────
   useEffect(() => {
@@ -215,7 +218,7 @@ export function PaymentScreen() {
               {methodView === 'qris' ? 'SCAN TO PAY' : 'OPEN ON PHONE'}
             </div>
             <div className="mt-3 font-crt text-3xl text-crt-cream/80 tracking-widest">
-              RP {appConfig.payment.amount.toLocaleString('id-ID')}
+              RP {(session?.amount ?? requestedAmount).toLocaleString('id-ID')}
             </div>
             <div className="mt-2 font-crt text-base text-crt-cream/50 tracking-widest">
               {methodView === 'qris'

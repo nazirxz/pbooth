@@ -149,6 +149,36 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (body.action === "get-settings") {
+      const { data, error } = await sb.from("app_settings")
+        .select("session_price,currency,updated_at")
+        .eq("key", "global")
+        .single();
+      if (error) throw error;
+      return jsonResponse(data, 200, req);
+    }
+
+    if (body.action === "update-settings") {
+      const sessionPrice = body.sessionPrice;
+      if (
+        !Number.isInteger(sessionPrice) || Number(sessionPrice) < 1_000 ||
+        Number(sessionPrice) > 100_000_000 || Number(sessionPrice) % 1_000 !== 0
+      ) {
+        return jsonResponse({ error: "invalid_session_price" }, 400, req);
+      }
+      const { data, error } = await sb.from("app_settings")
+        .update({
+          session_price: Number(sessionPrice),
+          updated_at: new Date().toISOString(),
+          updated_by: admin.user.id,
+        })
+        .eq("key", "global")
+        .select("session_price,currency,updated_at")
+        .single();
+      if (error) throw error;
+      return jsonResponse(data, 200, req);
+    }
+
     if (body.action === "list") {
       const page = Number.isInteger(body.page)
         ? Math.max(0, Number(body.page))
