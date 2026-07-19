@@ -11,6 +11,7 @@ if (typeof window !== 'undefined' && (window as any).pbooth) {
 
 const path = window.location.pathname
 const shareMatch = path.match(/^\/s\/([^/?#]+)/)
+const shareToken = new URLSearchParams(window.location.search).get('t') ?? ''
 const adminMatch = path === '/admin' || path.startsWith('/admin/')
 
 if (shareMatch) {
@@ -25,10 +26,9 @@ console.log('[pbooth] route', { path, sharedSessionId: shareMatch?.[1] ?? null, 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     {shareMatch
-      ? <SharePage sessionId={shareMatch[1]} />
+      ? <SharePage sessionId={shareMatch[1]} shareToken={shareToken} />
       : adminMatch
         ? <AdminPage />
         : <App />}
   </React.StrictMode>,
 )
-

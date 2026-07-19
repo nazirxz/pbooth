@@ -20,11 +20,15 @@ export async function uploadPhoto(
     console.warn('[supabase] uploadPhoto failed:', upErr.message)
     return null
   }
-  const { error: dbErr } = await sb.from('photos').insert({
+  const { error: dbErr } = await sb.from('photos').upsert({
     session_id: sessionId,
     frame_index: frameIndex,
     storage_path: path,
-  })
+    storage_backend: 'supabase',
+    size_bytes: blob.size,
+    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    expired_at: null,
+  }, { onConflict: 'session_id,frame_index' })
   if (dbErr) console.warn('[supabase] photos insert failed:', dbErr.message)
   return path
 }

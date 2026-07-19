@@ -40,6 +40,7 @@ export function DecorateScreen() {
   const [step, setStep] = useState<Step>('sticker')
 
   const sessionId = useSession((s) => s.sessionId)
+  const shareToken = useSession((s) => s.shareToken)
   const [uploadStatuses, setUploadStatuses] = useState<Record<number, 'idle' | 'uploading' | 'success' | 'error'>>({})
   const [isCheckingUpload, setIsCheckingUpload] = useState(false)
   const [hasUploadError, setHasUploadError] = useState(false)
@@ -47,12 +48,12 @@ export function DecorateScreen() {
 
   // Start background upload of all photos on mount
   useEffect(() => {
-    if (!sessionId || photos.length === 0) return
+    if (!sessionId || !shareToken || photos.length === 0) return
 
     const startUpload = (p: CapturedPhoto) => {
       setUploadStatuses((prev) => ({ ...prev, [p.index]: 'uploading' }))
       
-      const promise = uploadPhoto(sessionId, p.index, p.blob)
+      const promise = uploadPhoto(sessionId, p.index, p.blob, shareToken)
         .then((path) => {
           if (path) {
             setUploadStatuses((prev) => ({ ...prev, [p.index]: 'success' }))
@@ -76,16 +77,16 @@ export function DecorateScreen() {
     photos.forEach((p) => {
       startUpload(p)
     })
-  }, [sessionId, photos])
+  }, [sessionId, shareToken, photos])
 
   const handleRetryUpload = () => {
-    if (!sessionId) return
+    if (!sessionId || !shareToken) return
     setHasUploadError(false)
     
     photos.forEach((p) => {
       if (uploadStatuses[p.index] === 'error') {
         setUploadStatuses((prev) => ({ ...prev, [p.index]: 'uploading' }))
-        const promise = uploadPhoto(sessionId, p.index, p.blob)
+        const promise = uploadPhoto(sessionId, p.index, p.blob, shareToken)
           .then((path) => {
             if (path) {
               setUploadStatuses((prev) => ({ ...prev, [p.index]: 'success' }))

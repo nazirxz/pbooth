@@ -34,6 +34,7 @@ export interface LiveAsset {
 interface SessionState {
   screen: ScreenId
   sessionId: string | null
+  shareToken: string | null
   paymentRowId: string | null
   payment: PaymentSession | null
   /** Timestamp (ms) when payment was confirmed paid. Drives the 5-min session timer. */
@@ -48,6 +49,7 @@ interface SessionState {
 
   goTo: (screen: ScreenId) => void
   setSessionId: (id: string | null) => void
+  setShareToken: (token: string | null) => void
   setPaymentRowId: (id: string | null) => void
   setPayment: (p: PaymentSession | null) => void
   markPaid: () => void
@@ -63,6 +65,7 @@ interface SessionState {
 const initial = {
   screen: 'boot' as ScreenId,
   sessionId: null,
+  shareToken: null,
   paymentRowId: null,
   payment: null,
   paidAt: null as number | null,
@@ -78,6 +81,7 @@ export const useSession = create<SessionState>((set) => ({
   ...initial,
   goTo: (screen) => set({ screen }),
   setSessionId: (sessionId) => set({ sessionId }),
+  setShareToken: (shareToken) => set({ shareToken }),
   setPaymentRowId: (paymentRowId) => set({ paymentRowId }),
   setPayment: (payment) => set({ payment }),
   markPaid: () => set({ paidAt: Date.now() }),

@@ -4,9 +4,10 @@ import { fetchSharedSession, type SharedSessionData } from './share-data'
 
 interface Props {
   sessionId: string
+  shareToken: string
 }
 
-export function SharePage({ sessionId }: Props) {
+export function SharePage({ sessionId, shareToken }: Props) {
   const [data, setData] = useState<SharedSessionData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -18,7 +19,7 @@ export function SharePage({ sessionId }: Props) {
 
     const tick = async () => {
       try {
-        const d = await fetchSharedSession(sessionId)
+        const d = await fetchSharedSession(sessionId, shareToken)
         if (!mounted) return
         setData(d)
         setError(null)
@@ -27,6 +28,9 @@ export function SharePage({ sessionId }: Props) {
         if (!d.liveVideoUrl && pollCount.current < 20) {
           pollCount.current += 1
           timer = setTimeout(tick, 3000)
+        } else {
+          // Download URLs live for 15 minutes; refresh before they expire.
+          timer = setTimeout(tick, 12 * 60 * 1000)
         }
       } catch (e) {
         if (mounted) setError((e as Error).message)
@@ -40,7 +44,7 @@ export function SharePage({ sessionId }: Props) {
       mounted = false
       if (timer) clearTimeout(timer)
     }
-  }, [sessionId])
+  }, [sessionId, shareToken])
 
   return (
     <div className="fixed inset-0 overflow-y-auto bg-black text-crt-cream"
@@ -95,6 +99,8 @@ function ErrorState({ error }: { error: string }) {
   const title =
     error === 'SESSION_NOT_FOUND'
       ? 'Session not found'
+      : error === 'ASSETS_EXPIRED'
+      ? 'Photos expired'
       : error === 'STORAGE_NOT_CONFIGURED'
       ? 'Storage offline'
       : 'Something went wrong'
@@ -102,7 +108,9 @@ function ErrorState({ error }: { error: string }) {
     <div className="text-center py-16">
       <div className="font-pixel text-xl text-crt-red mb-4">● {title.toUpperCase()}</div>
       <div className="font-crt text-base text-crt-cream/70 max-w-xs mx-auto">
-        Coba scan ulang QR-nya, atau minta operator booth untuk ngecek.
+        {error === 'ASSETS_EXPIRED'
+          ? 'Masa simpan foto dari sesi ini sudah berakhir.'
+          : 'Coba scan ulang QR-nya, atau minta operator booth untuk ngecek.'}
       </div>
     </div>
   )

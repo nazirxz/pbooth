@@ -53,13 +53,22 @@ function summarizePrintPayload(dataUrl: string) {
 function summarizePrinters(
   printers: Awaited<ReturnType<Electron.WebContents['getPrintersAsync']>>,
 ): PrinterSummary[] {
-  return printers.map((p) => ({
-    name: p.name,
-    displayName: p.displayName,
-    description: p.description,
-    status: p.status,
-    isDefault: p.isDefault,
-  }))
+  return printers.map((p) => {
+    // Electron 41 moved platform-specific fields under `options`. Preserve
+    // compatibility with the older top-level Windows shape for diagnostics.
+    const legacy = p as Electron.PrinterInfo & { status?: number; isDefault?: boolean }
+    const platformOptions = p.options as Record<string, string>
+    const optionStatus = Number(platformOptions.status)
+    const optionIsDefault = platformOptions.isDefault ?? platformOptions['is-default']
+
+    return {
+      name: p.name,
+      displayName: p.displayName,
+      description: p.description,
+      status: legacy.status ?? (Number.isFinite(optionStatus) ? optionStatus : 0),
+      isDefault: legacy.isDefault ?? optionIsDefault === 'true',
+    }
+  })
 }
 
 function createWindow() {
@@ -176,8 +185,8 @@ ipcMain.handle(
           requestedDeviceName: wanted,
           deviceName,
           displayName: match.displayName,
-          isDefault: match.isDefault,
-          status: match.status,
+          isDefault: matchedPrinter.isDefault,
+          status: matchedPrinter.status,
         })
       } catch (e) {
         console.error('[printer:main] Failed while resolving printer', e)
@@ -188,8 +197,9 @@ ipcMain.handle(
       try {
         const printers = await win.webContents.getPrintersAsync()
         printerNames = printers.map((p) => p.name)
-        console.info('[printer:main] Installed printers', summarizePrinters(printers))
-        const defaultPrinter = printers.find((p) => p.isDefault)
+        const summarizedPrinters = summarizePrinters(printers)
+        console.info('[printer:main] Installed printers', summarizedPrinters)
+        const defaultPrinter = summarizedPrinters.find((p) => p.isDefault)
         console.info('[printer:main] Using default printer', defaultPrinter?.name ?? '(OS default)')
       } catch (e) {
         console.warn('[printer:main] Failed to list printers before default print', e)
@@ -226,7 +236,10 @@ ipcMain.handle(
         <html>
         <head>
           <style>
-            @page { size: ${landscape ? '6in 4in' : '4in 6in'}; margin: 0; }
+            /* In silent mode the DNP queue owns the media size/orientation.
+               Sending a custom CSS media size can make Chromium replace the
+               driver's named "PR (4x6)" form with a generic custom form. */
+            @page { size: ${silent ? 'auto' : landscape ? '6in 4in' : '4in 6in'}; margin: 0; }
             html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: white; }
             .print-container {
               position: relative;
@@ -323,7 +336,7 @@ ipcMain.handle(
             silent,
             landscape,
             rotation,
-            pageSize: '4x6',
+            pageSize: silent ? 'printer-default' : 'print-dialog',
             image: imageInfo,
           })
         } catch (e) {
@@ -342,12 +355,11 @@ ipcMain.handle(
             deviceName,
             printBackground: true,
             margins: { marginType: 'none' },
-            landscape,
-            // Always send 4x6 portrait page size (101600 × 152400 microns).
-            // DNP DS-RX1 driver only exposes 'PR (4x6)' — there is no '6x4'
-            // profile. The `landscape` flag rotates the content within the
-            // page, it does NOT change the paper size definition.
-            pageSize: { width: 101_600, height: 152_400 },
+            // Both DNP queues are configured with the named "PR (4x6)" form.
+            // Let the selected queue supply its media size/orientation so a
+            // silent job behaves exactly like the Windows print dialog. This
+            // also preserves queue-specific settings such as 2-inch cut.
+            usePrinterDefaultPageSize: true,
           },
           (success, failureReason) => {
             finish(() => {
@@ -359,7 +371,7 @@ ipcMain.handle(
                   silent,
                   landscape,
                   rotation,
-                  pageSize: '4x6',
+                  pageSize: 'printer-default',
                   note:
                     'Electron/Windows accepted the print job. This does not prove the physical printer completed it.',
                   printer: matchedPrinter,

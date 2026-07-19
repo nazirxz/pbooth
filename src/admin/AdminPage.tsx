@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AdminLogin } from './AdminLogin'
 import { AdminDashboard } from './AdminDashboard'
 import { AdminGallery } from './AdminGallery'
@@ -9,10 +9,16 @@ import type { AdminSessionRow } from '@/lib/supabase/sessions'
 type View = 'dashboard' | 'gallery'
 
 export function AdminPage() {
-  const [authed, setAuthed] = useState(() => checkAdminAuth())
+  const [authed, setAuthed] = useState<boolean | null>(null)
   const [view, setView] = useState<View>('gallery')
   const [selectedSession, setSelectedSession] = useState<AdminSessionRow | null>(null)
   const [galleryKey, setGalleryKey] = useState(0) // used to force remount gallery after delete
+
+  useEffect(() => {
+    let active = true
+    checkAdminAuth().then((ok) => { if (active) setAuthed(ok) })
+    return () => { active = false }
+  }, [])
 
   if (!adminConfigured()) {
     return (
@@ -28,11 +34,18 @@ export function AdminPage() {
           <div className="font-pixel text-crt-red text-xs rgb-split tracking-widest">ERROR</div>
           <h1 className="font-pixel text-white text-sm tracking-widest">ADMIN NOT CONFIGURED</h1>
           <div className="font-crt text-crt-cream/50 text-lg max-w-sm leading-snug">
-            Tambahkan <code className="text-crt-amber">VITE_ADMIN_PASSWORD</code> dan{' '}
-            <code className="text-crt-amber">VITE_SUPABASE_SERVICE_ROLE_KEY</code>{' '}
-            ke file .env kamu.
+            Tambahkan <code className="text-crt-amber">VITE_SUPABASE_URL</code> dan{' '}
+            <code className="text-crt-amber">VITE_SUPABASE_ANON_KEY</code> ke file .env.
           </div>
         </div>
+      </div>
+    )
+  }
+
+  if (authed === null) {
+    return (
+      <div className="fixed inset-0 bg-black grid place-items-center font-crt text-crt-amber text-xl animate-blink">
+        CHECKING ADMIN SESSION...
       </div>
     )
   }
@@ -84,7 +97,7 @@ export function AdminPage() {
           {/* Logout */}
           <button
             id="admin-logout"
-            onClick={() => { logoutAdmin(); setAuthed(false) }}
+            onClick={() => { void logoutAdmin(); setAuthed(false) }}
             className="font-crt text-crt-cream/35 hover:text-crt-red text-lg tracking-widest transition-colors"
           >
             ✕ LOGOUT
