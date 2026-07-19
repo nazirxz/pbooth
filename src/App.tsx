@@ -6,7 +6,6 @@ import { BootScreen } from '@/screens/BootScreen'
 import { HomeScreen } from '@/screens/HomeScreen'
 import { PaymentScreen } from '@/screens/PaymentScreen'
 import { InstructionsScreen } from '@/screens/InstructionsScreen'
-import { TemplateScreen } from '@/screens/TemplateScreen'
 import { FilterScreen } from '@/screens/FilterScreen'
 import { CaptureScreen } from '@/screens/CaptureScreen'
 import { DecorateScreen } from '@/screens/DecorateScreen'
@@ -57,7 +56,6 @@ function renderScreen(s: ScreenId) {
     case 'settings': return <SettingsScreen />
     case 'payment': return <PaymentScreen />
     case 'instructions': return <InstructionsScreen />
-    case 'template': return <TemplateScreen />
     case 'filter': return <FilterScreen />
     case 'capture': return <CaptureScreen />
     case 'decorate': return <DecorateScreen />

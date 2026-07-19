@@ -8,7 +8,6 @@ export type ScreenId =
   | 'settings'
   | 'payment'
   | 'instructions'
-  | 'template'
   | 'filter'
   | 'capture'
   | 'decorate'
@@ -29,6 +28,7 @@ export interface ComposedOutput {
 export interface LiveAsset {
   blob: Blob
   ext: 'gif' | 'webm' | 'mp4'
+  filterId: FilterId
 }
 
 interface SessionState {
@@ -52,7 +52,6 @@ interface SessionState {
   setPayment: (p: PaymentSession | null) => void
   markPaid: () => void
   startPreviewCountdown: () => void
-  setTemplate: (t: TemplateId) => void
   setFilter: (f: FilterId) => void
   addPhoto: (photo: CapturedPhoto) => void
   clearPhotos: () => void
@@ -83,7 +82,6 @@ export const useSession = create<SessionState>((set) => ({
   setPayment: (payment) => set({ payment }),
   markPaid: () => set({ paidAt: Date.now() }),
   startPreviewCountdown: () => set({ previewStartedAt: Date.now() }),
-  setTemplate: (template) => set({ template }),
   setFilter: (filter) => set({ filter }),
   addPhoto: (photo) => set((s) => ({ photos: [...s.photos, photo] })),
   clearPhotos: () =>

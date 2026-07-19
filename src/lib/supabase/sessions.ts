@@ -24,7 +24,7 @@ export async function dbCreateSession(): Promise<SessionRow | null> {
   if (!sb) return null
   const { data, error } = await sb
     .from('sessions')
-    .insert({ status: 'pending_payment' })
+    .insert({ status: 'pending_payment', template_id: appConfig.templates[0].id })
     .select('*')
     .single()
   if (error) {

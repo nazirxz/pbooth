@@ -55,16 +55,20 @@ export const appConfig = {
       /** Polling timeout for the file-ready check after a capture, in ms. */
       captureTimeoutMs: parseInt(import.meta.env.VITE_DCC_CAPTURE_TIMEOUT_MS ?? '12000', 10),
     },
+    /**
+     * Post-capture rotation in degrees (0, 90, 180, 270).
+     * Use this when the camera or HDMI capture card is mounted in a different
+     * orientation than the photo layout expects. For example, if the DSLR is
+     * mounted vertically (portrait) in the booth but the HDMI feed and JPEG
+     * files are in landscape orientation, set this to 90 or 270 to rotate
+     * the captured photo to match the expected portrait orientation.
+     */
+    captureRotation: parseInt(import.meta.env.VITE_CAMERA_CAPTURE_ROTATION ?? '0', 10) as 0 | 90 | 180 | 270,
   },
   capture: {
-    // Number of shots per session is driven by the selected template's `frames`,
-    // not a global config — so picking TRIO captures 3, DUO captures 2, etc.
+    // Number of shots per session is driven by the fixed GRID template.
     countdownSec: parseInt(import.meta.env.VITE_CAPTURE_COUNTDOWN_SEC ?? '5', 10),
-    // How long to show the just-captured photo as a review popup before the
-    // next shot — doubles as confirmation feedback and hides the tether
-    // download wait behind something the customer actually wants to see.
-    reviewMs: parseInt(import.meta.env.VITE_CAPTURE_REVIEW_MS ?? '1500', 10),
-    // Brief breath after the review before the next countdown starts.
+    // Brief breath after review confirmation before the next countdown starts.
     delayBetweenFramesMs: parseInt(import.meta.env.VITE_DELAY_BETWEEN_FRAMES_MS ?? '250', 10),
   },
   payment: {
@@ -122,11 +126,15 @@ export const appConfig = {
   },
   printer: {
     enabled: true,
-    // Substring of the printer's name in the Windows printer list. The main
-    // process matches it case-insensitively against installed printers, so
-    // "DS-RX1" also matches "DNP DS-RX1". Leave empty to use the system
-    // default printer. Override per kiosk with VITE_PRINTER_NAME.
-    deviceName: import.meta.env.VITE_PRINTER_NAME ?? 'DS-RX1',
+    // Two Windows queues point to the same physical DS-RX1. Explicit queue
+    // names prevent the full job from partially matching the cut queue.
+    fullDeviceName:
+      import.meta.env.VITE_PRINTER_FULL_NAME ??
+      import.meta.env.VITE_PRINTER_NAME ??
+      'PBOOTH DS-RX1 FULL',
+    // Separate Windows queue pointing to the same physical DS-RX1 with the
+    // driver's "2inch cut" feature enabled.
+    cutDeviceName: import.meta.env.VITE_PRINTER_CUT_NAME ?? 'PBOOTH DS-RX1 CUT',
     // Silent print (no OS dialog). Set false for testing with print preview.
     silent: import.meta.env.VITE_PRINTER_SILENT !== 'false',
     // Print orientation (landscape vs portrait).
@@ -135,8 +143,6 @@ export const appConfig = {
     rotation: parseInt(import.meta.env.VITE_PRINTER_ROTATION ?? '0', 10),
   },
   templates: [
-    { id: 'duo-2', label: 'DUO', frames: 2, layout: 'vertical' },
-    { id: 'strip-3', label: 'TRIO', frames: 3, layout: 'vertical' },
     { id: 'strip-4', label: 'GRID', frames: 4, layout: 'grid' },
   ],
   filters: [
@@ -168,7 +174,8 @@ if (typeof console !== 'undefined') {
     `${tag} mode=${mode} provider=${provider} supabaseConfigured=${supabaseSet} storage=${storageBackend} r2Configured=${r2Set}`,
   )
   console.info(
-    `${tag} printer deviceName=${appConfig.printer.deviceName || '(default)'} ` +
+    `${tag} printer fullDeviceName=${appConfig.printer.fullDeviceName || '(missing)'} ` +
+      `cutDeviceName=${appConfig.printer.cutDeviceName || '(missing)'} ` +
       `silent=${appConfig.printer.silent} landscape=${appConfig.printer.landscape} ` +
       `rotation=${appConfig.printer.rotation}`,
   )

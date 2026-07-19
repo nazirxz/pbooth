@@ -2,29 +2,34 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { ChannelBar } from '@/components/ChannelBar'
 import { TVButton } from '@/components/TVButton'
+import { appConfig, type FilterId } from '@/config/app-config'
 import { useSession, type CapturedPhoto } from '@/state/session-store'
 import { useDecoration, type PlacedSticker } from '@/state/decoration-store'
 import { useTheme } from '@/state/theme-store'
 import { STICKERS, getSticker } from '@/lib/stickers'
-import { computePaperLayout, type PaperLayout } from '@/lib/strip-layout'
+import { computePaperLayout, type PaperLayout, type PrintMode } from '@/lib/strip-layout'
 import { buildGifFromPhotos } from '@/lib/gif-encoder'
 import { uploadPhoto } from '@/lib/storage'
+import { dbUpdateSession } from '@/lib/supabase/sessions'
 
-type Step = 'sticker' | 'color'
+type Step = 'sticker' | 'filter' | 'color' | 'print'
 
 export function DecorateScreen() {
   const goTo = useSession((s) => s.goTo)
   const photos = useSession((s) => s.photos)
   const template = useSession((s) => s.template)
   const filter = useSession((s) => s.filter)
+  const setFilter = useSession((s) => s.setFilter)
   const liveAsset = useSession((s) => s.liveAsset)
   const setLiveAsset = useSession((s) => s.setLiveAsset)
   const theme = useTheme((s) => s.theme)
 
   const stripColor = useDecoration((s) => s.stripColor)
+  const printMode = useDecoration((s) => s.printMode)
   const stickers = useDecoration((s) => s.stickers)
   const selectedId = useDecoration((s) => s.selectedStickerId)
   const setStripColor = useDecoration((s) => s.setStripColor)
+  const setPrintMode = useDecoration((s) => s.setPrintMode)
   const addSticker = useDecoration((s) => s.addSticker)
   const moveSticker = useDecoration((s) => s.moveSticker)
   const removeSticker = useDecoration((s) => s.removeSticker)
@@ -122,6 +127,12 @@ export function DecorateScreen() {
       }
 
       setIsCheckingUpload(false)
+      // Persist the chosen filter to the session row
+      if (sessionId) {
+        await dbUpdateSession(sessionId, { filter_id: filter, status: 'capturing' }).catch((e) =>
+          console.warn('[decorate] failed to save filter_id', e),
+        )
+      }
       goTo('preview')
     } catch (e) {
       console.error('Error waiting for uploads:', e)
@@ -141,7 +152,7 @@ export function DecorateScreen() {
   // Plain setTimeout (not requestIdleCallback) so it fires reliably even with
   // CSS animations / sticker drags eating idle time.
   useEffect(() => {
-    if (liveAsset || photos.length === 0) return
+    if (liveAsset?.filterId === filter || photos.length === 0) return
     let cancelled = false
 
     const handle = window.setTimeout(() => {
@@ -152,7 +163,7 @@ export function DecorateScreen() {
         .then((gif) => {
           if (cancelled) return
           console.log('[decorate] gif ready, caching to session store')
-          setLiveAsset(gif)
+          setLiveAsset({ ...gif, filterId: filter })
         })
         .catch((e) => console.warn('[decorate] background gif build failed', e))
     }, 400)
@@ -163,7 +174,11 @@ export function DecorateScreen() {
     }
   }, [liveAsset, photos, filter, theme, setLiveAsset])
 
-  const layout = useMemo(() => computePaperLayout(template), [template])
+  const layout = useMemo(() => computePaperLayout(template, printMode), [template, printMode])
+  const filterCss = useMemo(
+    () => theme.filters.find((f) => f.id === filter)?.css ?? 'none',
+    [filter, theme],
+  )
 
   return (
     <div className="absolute inset-0 grid grid-rows-[auto_1fr]">
@@ -172,7 +187,7 @@ export function DecorateScreen() {
       <div className="grid grid-cols-[auto_1fr] gap-8 px-10 pb-4 min-h-0">
         <StripStage
           photos={photos}
-          filterId={filter}
+          filterCss={filterCss}
           layout={layout}
           stripColor={stripColor}
           stickers={stickers}
@@ -193,17 +208,40 @@ export function DecorateScreen() {
             />
             <StepBadge
               n={2}
-              label="STRIP COLOR"
+              label="FILTER"
+              active={step === 'filter'}
+              onClick={() => setStep('filter')}
+            />
+            <StepBadge
+              n={3}
+              label="COLOR"
               active={step === 'color'}
               onClick={() => setStep('color')}
+            />
+            <StepBadge
+              n={4}
+              label="PRINT"
+              active={step === 'print'}
+              onClick={() => setStep('print')}
             />
           </div>
 
           <div className="flex-1 overflow-y-auto min-h-0 pr-1">
             {step === 'sticker' ? (
               <StickerGrid onPick={(a) => addSticker(a)} />
-            ) : (
+            ) : step === 'filter' ? (
+              <FilterPicker
+                selected={filter}
+                onChange={(f) => {
+                  setFilter(f)
+                  // Invalidate pre-built live asset so it re-encodes with new filter
+                  setLiveAsset(null)
+                }}
+              />
+            ) : step === 'color' ? (
               <StripColorPicker color={stripColor} onChange={setStripColor} />
+            ) : (
+              <PrintModePicker selected={printMode} onChange={setPrintMode} />
             )}
           </div>
 
@@ -213,13 +251,31 @@ export function DecorateScreen() {
                 <TVButton variant="ghost" size="md" onClick={() => goTo('preview')}>
                   ⏭ SKIP
                 </TVButton>
+                <TVButton variant="primary" size="lg" onClick={() => setStep('filter')}>
+                  NEXT ▶
+                </TVButton>
+              </>
+            ) : step === 'filter' ? (
+              <>
+                <TVButton variant="ghost" size="md" onClick={() => setStep('sticker')}>
+                  ◀ BACK
+                </TVButton>
                 <TVButton variant="primary" size="lg" onClick={() => setStep('color')}>
+                  NEXT ▶
+                </TVButton>
+              </>
+            ) : step === 'color' ? (
+              <>
+                <TVButton variant="ghost" size="md" onClick={() => setStep('filter')}>
+                  ◀ BACK
+                </TVButton>
+                <TVButton variant="primary" size="lg" onClick={() => setStep('print')}>
                   NEXT ▶
                 </TVButton>
               </>
             ) : (
               <>
-                <TVButton variant="ghost" size="md" onClick={() => setStep('sticker')}>
+                <TVButton variant="ghost" size="md" onClick={() => setStep('color')}>
                   ◀ BACK
                 </TVButton>
                 <TVButton variant="primary" size="lg" onClick={handleDone}>
@@ -305,7 +361,7 @@ function StepBadge({
 
 function StripStage(props: {
   photos: CapturedPhoto[]
-  filterId: string
+  filterCss: string
   layout: PaperLayout
   stripColor: string
   stickers: PlacedSticker[]
@@ -317,7 +373,7 @@ function StripStage(props: {
 }) {
   const {
     photos,
-    filterId,
+    filterCss,
     layout,
     stripColor,
     stickers,
@@ -334,45 +390,51 @@ function StripStage(props: {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+    let cancelled = false
+
     canvas.width = layout.paper.w
     canvas.height = layout.paper.h
     const ctx = canvas.getContext('2d')!
 
-    // paper
-    ctx.fillStyle = stripColor
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    drawPaper(ctx, canvas, stripColor)
 
-    const filterCss = FILTER_CSS_MAP[filterId] ?? 'none'
+    const draw = async () => {
+      const loaded = await Promise.all(
+        photos.map(async (p) => {
+          try {
+            return [p.index, await loadCanvasImage(p.dataUrl)] as const
+          } catch (e) {
+            console.warn(`[decorate] failed to load preview photo ${p.index}`, e)
+            return [p.index, null] as const
+          }
+        }),
+      )
+      if (cancelled) return
 
-    for (const section of layout.sections) {
-      ctx.filter = filterCss
-      for (let i = 0; i < section.frames.length; i++) {
-        const f = section.frames[i]
-        const p = photos[i]
-        if (!p) continue
-        const img = new Image()
-        img.src = p.dataUrl
-        img.onload = () => drawCover(ctx, img, f.x, f.y, f.w, f.h)
-        if (img.complete) drawCover(ctx, img, f.x, f.y, f.w, f.h)
+      const imagesByIndex = new Map(loaded)
+      drawPaper(ctx, canvas, stripColor)
+
+      for (const section of layout.sections) {
+        for (let i = 0; i < section.frames.length; i++) {
+          const f = section.frames[i]
+          const img = imagesByIndex.get(f.photoIndex)
+          if (!img) continue
+          ctx.save()
+          ctx.filter = filterCss
+          drawCover(ctx, img, f.x, f.y, f.w, f.h)
+          ctx.restore()
+        }
       }
-      ctx.filter = 'none'
+
+      drawCutLine(ctx, layout)
     }
 
-    // Redraw the cut-line after a tick so it sits on top of the photos
-    requestAnimationFrame(() => {
-      if (layout.cutLine) {
-        ctx.save()
-        ctx.strokeStyle = 'rgba(0,0,0,0.2)'
-        ctx.lineWidth = 1
-        ctx.setLineDash([8, 8])
-        ctx.beginPath()
-        ctx.moveTo(layout.cutLine.x, layout.cutLine.y1)
-        ctx.lineTo(layout.cutLine.x, layout.cutLine.y2)
-        ctx.stroke()
-        ctx.restore()
-      }
-    })
-  }, [photos, filterId, stripColor, layout])
+    void draw()
+
+    return () => {
+      cancelled = true
+    }
+  }, [photos, filterCss, stripColor, layout])
 
   const handleStagePointerDown = (e: React.PointerEvent) => {
     // Tap on stage (outside a sticker) clears selection
@@ -408,18 +470,39 @@ function StripStage(props: {
   )
 }
 
-const FILTER_CSS_MAP: Record<string, string> = {
-  'none': 'none',
-  'bw-grain': 'grayscale(1) contrast(1.15) brightness(1.05)',
-  'sepia': 'sepia(0.75) contrast(1.1) saturate(1.2)',
-  'vhs': 'saturate(1.4) contrast(1.2) hue-rotate(-5deg)',
-  'neon-80s': 'saturate(1.6) contrast(1.3) hue-rotate(280deg)',
-  'polaroid': 'saturate(0.85) contrast(0.95) brightness(1.08)',
-  'bubblegum': 'saturate(1.3) contrast(1.05) hue-rotate(-12deg)',
-  'dreamy': 'saturate(0.9) contrast(0.95) brightness(1.1) blur(0.3px)',
-  'hologram': 'saturate(1.6) contrast(1.15) hue-rotate(180deg)',
-  'kawaii': 'saturate(1.1) brightness(1.12) contrast(0.92)',
-  'peach': 'saturate(1.2) sepia(0.2) hue-rotate(-10deg) brightness(1.05)',
+function drawPaper(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, stripColor: string) {
+  ctx.save()
+  ctx.filter = 'none'
+  ctx.fillStyle = stripColor
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.restore()
+}
+
+function drawCutLine(ctx: CanvasRenderingContext2D, layout: PaperLayout) {
+  if (!layout.cutLine) return
+  ctx.save()
+  ctx.filter = 'none'
+  ctx.strokeStyle = 'rgba(0,0,0,0.2)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([8, 8])
+  ctx.beginPath()
+  ctx.moveTo(layout.cutLine.x, layout.cutLine.y1)
+  ctx.lineTo(layout.cutLine.x, layout.cutLine.y2)
+  ctx.stroke()
+  ctx.restore()
+}
+
+function loadCanvasImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = src
+    if (img.complete) {
+      if (img.naturalWidth > 0) resolve(img)
+      else reject(new Error('Image failed to load'))
+    }
+  })
 }
 
 function drawCover(
@@ -564,6 +647,40 @@ function clamp01(v: number) {
 
 const STRIP_COLOR_PRESETS = ['#224a34', '#a9d099', '#000000', '#ffffff']
 
+function PrintModePicker({
+  selected,
+  onChange,
+}: {
+  selected: PrintMode
+  onChange: (mode: PrintMode) => void
+}) {
+  const options: Array<{ mode: PrintMode; label: string; detail: string }> = [
+    { mode: 'full-4x6', label: 'FULL 4X6', detail: 'NO CUT' },
+    { mode: 'cut-2x6', label: 'CUT 2X6', detail: '2 PIECES' },
+  ]
+
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      {options.map((option) => (
+        <button
+          key={option.mode}
+          type="button"
+          onClick={() => onChange(option.mode)}
+          className={clsx(
+            'touch-press min-h-40 rounded-xl border-4 bg-black/40 px-5 py-6 font-crt tracking-widest',
+            selected === option.mode
+              ? 'border-crt-phosphor bg-crt-phosphor/15 text-crt-phosphor shadow-[0_0_24px_rgba(57,255,20,0.3)]'
+              : 'border-crt-cream/30 text-crt-cream',
+          )}
+        >
+          <span className="block text-3xl">{option.label}</span>
+          <span className="mt-3 block text-xl text-crt-amber">{option.detail}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function StripColorPicker({
   color,
   onChange,
@@ -636,3 +753,29 @@ function StickerGrid({ onPick }: { onPick: (assetId: string) => void }) {
   )
 }
 
+function FilterPicker({
+  selected,
+  onChange,
+}: {
+  selected: FilterId
+  onChange: (f: FilterId) => void
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {appConfig.filters.map((f) => (
+        <button
+          key={f.id}
+          onClick={() => onChange(f.id as FilterId)}
+          className={clsx(
+            'touch-press border-4 rounded-xl py-4 font-crt text-2xl tracking-widest shrink-0',
+            selected === f.id
+              ? 'border-crt-phosphor bg-crt-phosphor/15 text-crt-phosphor shadow-[0_0_20px_rgba(57,255,20,0.4)]'
+              : 'border-crt-cream/30 bg-black/40 text-crt-cream',
+          )}
+        >
+          {f.label}
+        </button>
+      ))}
+    </div>
+  )
+}

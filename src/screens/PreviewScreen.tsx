@@ -34,6 +34,7 @@ export function PreviewScreen() {
   const startPreviewCountdown = useSession((s) => s.startPreviewCountdown)
   const theme = useTheme((s) => s.theme)
   const stripColor = useDecoration((s) => s.stripColor)
+  const printMode = useDecoration((s) => s.printMode)
   const placedStickers = useDecoration((s) => s.stickers)
 
   const [qrImg, setQrImg] = useState<string>('')
@@ -102,6 +103,7 @@ export function PreviewScreen() {
           photos,
           template,
           filterId: filter,
+          printMode,
           theme,
           decoration: { stripColor, stickers: placedStickers },
         })
@@ -128,17 +130,18 @@ export function PreviewScreen() {
           setLiveError(null)
           void (async () => {
             try {
-              let video = liveAsset
+              let video = liveAsset?.filterId === filter ? liveAsset : null
               if (!video) {
                 setLiveState('encoding')
                 const filterCss = theme.filters.find((f) => f.id === filter)?.css ?? 'none'
-                video = await buildVideoFromPhotos({
+                const encoded = await buildVideoFromPhotos({
                   photos,
                   width: 1280,
                   frameDelayMs: 500,
                   loopCount: 3,
                   filterCss,
                 })
+                video = { ...encoded, filterId: filter }
                 if (cancelled) return
                 setLiveAsset(video)
               }
@@ -175,7 +178,7 @@ export function PreviewScreen() {
     return () => {
       cancelled = true
     }
-  }, [composed, photos, template, filter, sessionId, setComposed, theme, stripColor, placedStickers, liveAsset, setLiveAsset])
+  }, [composed, photos, template, filter, printMode, sessionId, setComposed, theme, stripColor, placedStickers, liveAsset, setLiveAsset])
 
   const handlePrint = async () => {
     if (!composed) {
@@ -191,7 +194,10 @@ export function PreviewScreen() {
     }
 
     const printOptions = {
-      deviceName: appConfig.printer.deviceName,
+      deviceName:
+        printMode === 'cut-2x6'
+          ? appConfig.printer.cutDeviceName
+          : appConfig.printer.fullDeviceName,
       silent: appConfig.printer.silent,
       landscape: appConfig.printer.landscape,
       rotation: appConfig.printer.rotation,
@@ -200,6 +206,7 @@ export function PreviewScreen() {
     console.info('[printer] Print requested from preview screen:', {
       sessionId,
       template,
+      printMode,
       options: printOptions,
       blobBytes: composed.blob.size,
       dataUrl: summarizeDataUrl(composed.dataUrl),
@@ -239,6 +246,9 @@ export function PreviewScreen() {
 
         <div className="flex flex-col gap-6 justify-center min-w-0">
           <div className="font-pixel text-5xl text-crt-phosphor rgb-split leading-tight">YOUR STRIP</div>
+          <div className="font-crt text-xl text-crt-cream tracking-widest -mt-3">
+            {printMode === 'cut-2x6' ? 'CUT 2X6 · 2 PIECES' : 'FULL 4X6 · NO CUT'}
+          </div>
           <div className="font-crt text-2xl text-crt-amber/90 tracking-widest animate-blink">
             ● WAITING FOR YOUR PHOTO
           </div>
