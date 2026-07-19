@@ -4,4 +4,16 @@
 -- payment status will never flip on the kiosk UI even when DOKU
 -- successfully notifies the webhook.
 
-alter publication supabase_realtime add table public.payments;
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'payments'
+  ) then
+    alter publication supabase_realtime add table public.payments;
+  end if;
+end
+$$;
